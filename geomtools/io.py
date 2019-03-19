@@ -59,6 +59,42 @@ def read_zr(fnm):
         GeomB=geom(np.array(atoms[1]), np.array(coords[1]))
     return GeomA,GeomB
 
+def read_coords(fnm, inp="Angstrom", out="Angstrom"):
+    """
+    Parameters
+    ----------
+    fnm : string
+        name or path of the coordinate file (any coord-only file, as xyz without header, in any unit)
+    inp : {"Angstrom","au","a.u.","bohr"}
+        unit of the input, default is Angstrom. NB case insensitive
+    out : {"Angstrom","au","a.u.","bohr"}
+        unit of the output, default is Angstrom. NB case insensitive
+        
+    Returns
+    -------
+    geom 
+        geometry object from the coord file
+    """
+    dict_ = {"angstrom":"angstrom","au":"au","a.u.":"au","bohr":"au"}
+    with open(fnm,"r") as f:
+        rl=f.readlines()
+        Natoms=int(rl[0])
+        atoms=[]
+        coords=[]
+        for i in range(Natoms):
+            atoms.append(rl[i].split()[0])
+            coords.append(np.asarray([np.float64(i) for i in rl[i].split()[1:]]))
+        if dict_[inp.lower()]==dict_[out.lower()]:
+            pass
+        elif dict_[inp.lower()]=="au" and dict_[out.lower()]=="angstrom":
+            coords=np.multiply(0.529177,coords)
+        elif dict_[inp.lower()]=="angstrom" and dict_[out.lower()]=="au":
+            coords=np.divide(coords,0.529177)
+        else:
+            print("combination of units of measure not implemented yet. Why don't you do it, bro?")
+        Geom=geom(np.array(atoms), np.array(coords))
+    return Geom
+
 def read_charge_txt(fnm):
     """
     Note
@@ -128,7 +164,39 @@ def write_zr(gA, gB, fnm):
             out.write("----\n")
             for i in range(len(gB.atoms)):
                 out.write(gB.atoms[i]+"    "+"    ".join(map(str,gB.inp_coords[i]))+"\n")
- 
+
+def write_coords(g, fnm, which="inp", inp="Angstrom", out="Angstrom"):
+    """
+    Note
+    ----
+    writes a geometry as coord-only file, in any unit
+    
+    Parameters
+    ----------
+    g : geom
+        geometry to write
+    fnm : str
+        name or path of the output file
+    which : {"inp", "com"}
+        coordinates to write
+    inp : {"Angstrom","au","a.u.","bohr"}
+        unit of the input, default is Angstrom. NB case insensitive
+    out : {"Angstrom","au","a.u.","bohr"}
+        unit of the output, default is Angstrom. NB case insensitive
+    """
+    dict_ = {"angstrom":"angstrom","au":"au","a.u.":"au","bohr":"au"}
+    if dict_[inp.lower()]==dict_[out.lower()]:
+        factor=1
+    elif dict_[inp.lower()]=="au" and dict_[out.lower()]=="angstrom":
+        factor=0.529177
+    elif dict_[inp.lower()]=="angstrom" and dict_[out.lower()]=="au":
+        factor=1.88973
+    else:
+        print("combination of units of measure not implemented yet. Why don't you do it, bro?")
+    with open(fnm,"w") as out:
+        for i in range(len(g.atoms)):
+            out.write(g.atoms[i]+"    "+"    ".join(map(str,np.multiply(factor,g.coords(which)[i])))+"\n")   
+           
 def write_frag_file(fnm,*args,Type="calculate"):
     """
     Note
@@ -144,6 +212,7 @@ def write_frag_file(fnm,*args,Type="calculate"):
         list=> args=[frag1,frag2...]
         individual=> args=frag1,frag2...
     """
+    from fragments import get_fragments
     if Type=="calculate":
         frag_list=get_fragments(args[0])
     elif Type=="list":

@@ -83,6 +83,27 @@ class geom:
         """
         return geom(self.atoms, np.add(self.coords(which), vect))
     
+    def mix(self, g, ratio=0.5):
+        """
+        Note
+        ----
+        useful tool for "oscillating" geometry optimisations. NB uses input coordinates
+        
+        Parameters
+        ----------
+        g : geom
+            geometry to mix with
+        ratio : float
+            ratio of self
+            
+        Returns
+        -------
+        geom
+            geometry obtained from mixing self with g with the desired ratio 
+        """
+        from fragments import mix_geoms
+        return mix_geoms(self,g,ratio)
+    
     def coords(self, which):
         """
         Parameters
@@ -130,7 +151,7 @@ class geom:
         charge : int
             the charge of the molecule(s), default is 0
         coords : {"Angstrom", "bohr", "au", "a.u."}
-            unit of measure for the coordinates, default is Angstrom
+            unit of measure for the coordinates, default is Angstrom. NB case insensitive
         out : {"Debye", "au", "a.u."}
             desired unit for the output, default is au
         
@@ -144,12 +165,12 @@ class geom:
         else:
             coc=np.zeros(3)
         d=np.sum(np.multiply(self.charges[method].reshape(len(self.atoms),1),self.inp_coords-coc),axis=0)
-        dict_={"au":"au", "a.u.":"au", "bohr":"au", "Angstrom":"Angstrom", "Debye":"Debye"}
-        if coords not in dict_.keys() or out not in dict_.keys():
+        dict_={"au":"au", "a.u.":"au", "bohr":"au", "angstrom":"angstrom", "debye":"debye"}
+        if coords.lower() not in dict_.keys() or out not in dict_.keys():
             print("combination of units of measure not implemented yet. Why don't you do it, bro?")
             sys.exit(0)
-        if coords=="Angstrom":
+        if dict_[coords.lower()]=="angstrom":
             d=np.divide(d,0.529177)
-        if out=="Debye":
+        if dict_[out.lower()]=="debye":
             d=np.divide(d,0.393456)
         return d     

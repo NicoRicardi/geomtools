@@ -7,6 +7,33 @@ import numpy as np
 import sys
 from geom import geom
 
+def mix_geoms(g1, which1="inp", g2, which2="inp", ratio=0.5,):
+    """
+    Note
+    ----
+    Yields a midpoint between two geometries with a specific ratio. Very useful if a geometry optimisation "oscillates" between two structures
+    Parameters
+    ----------
+    g1 : geom
+        geometry 1
+    which1 : {"inp", "com"}
+        coordinates to use for g1
+    g2 : geom
+        geometry 2
+    which2 : {"inp", "com"}
+        coordinates to use for g2        
+    ratio : float
+        weight of g1, default is 0.5. 
+        
+    Returns
+    -------
+    geom
+        mixed geometry
+    """
+    if (g1.atoms!=g2.atoms).all():
+        print("The two geometries do not have the same atoms!!")    #Check if geometries have the same atom list
+    return geom(g1.atoms(),np.add(np.multiply(ratio,g1.coords(which1)),np.multiply(1-ratio,g2.coords(which2))))
+                
 def dist_order(g, which="com"):
     """
     Note
@@ -29,7 +56,7 @@ def dist_order(g, which="com"):
     order=d.argsort()
     return (d, order)
 
-def check_geoms_order(g1, g2, thresh = 0.00005):
+def check_geoms_order(g1, g2, thresh=0.00005):
     """
     Note
     ----
