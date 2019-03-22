@@ -1,0 +1,10 @@
+setup.py
+geomtools/__init__.py
+geomtools/fragments.py
+geomtools/geom.py
+geomtools/io.py
+geomtools/transformations.py
+geomtools.egg-info/PKG-INFO
+geomtools.egg-info/SOURCES.txt
+geomtools.egg-info/dependency_links.txt
+geomtools.egg-info/top_level.txt

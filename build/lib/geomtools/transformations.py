@@ -4,7 +4,7 @@
 Contains all geometric transformations: translations, rotations,etc...
 """
 import numpy as np
-from geomtools.geom import geom
+from geom import geom
 
 def find_center(geom):
     """

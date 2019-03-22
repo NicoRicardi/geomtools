@@ -7,7 +7,7 @@ import numpy as np
 import sys
 from geom import geom
 
-def mix_geoms(g1, g2, which1="inp", which2="inp", ratio=0.5,):
+def mix_geoms(g1, which1="inp", g2, which2="inp", ratio=0.5,):
     """
     Note
     ----

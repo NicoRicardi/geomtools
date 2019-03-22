@@ -4,7 +4,7 @@
 Contains all input-output functions
 """
 import numpy as np
-from geomtools.geom import geom
+from geom import geom
     
 def read_xyz(fnm):
     """

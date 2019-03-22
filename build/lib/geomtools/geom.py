@@ -25,6 +25,7 @@ class geom:
         """
         self.atoms = atoms
         self.inp_coords = inp_coords
+        self.dipole_from_qm = {}
         self.coord_unit = coord_unit
         
     def get_com(self):
@@ -38,7 +39,7 @@ class geom:
         array(3)
             the center of mass of the geometry
         """
-        from geomtools.transformations import find_center
+        from transformations import find_center
         if not hasattr(self, "com"):
             self.com = find_center(self)
         return self.com
@@ -105,7 +106,7 @@ class geom:
         geom
             geometry obtained from mixing self with g with the desired ratio 
         """
-        from geomtools.fragments import mix_geoms
+        from fragments import mix_geoms
         return mix_geoms(self,g,ratio)
     
     def coords(self, which):
@@ -139,7 +140,7 @@ class geom:
         geom
             geometry object containing self+g
         """
-        from geomtools.fragments import comb_geoms
+        from fragments import comb_geoms
         return comb_geoms(self, g)
     
     def get_charge_dipole(self, method, charge=0, dip_unit="au"):
@@ -161,26 +162,11 @@ class geom:
         if not hasattr(self,"charge_dipoles"):
                     self.charge_dipoles = {}
                     self.charge_dipoles_units={}
-        self.charge_dipoles[method]=calculate_charge_dipole(self,method,coords=self.coord_unit,out=dip_unit,charge=0)
+        self.charge_dipoles[method]=calculate_charge_dipole(self,method,charge=0,self.coord_unit,out=dip_unit)
         self.charge_dipoles_units[method]=dip_unit
         return self.charge_dipoles[method]
-    
-    def change_coord_unit(self,out):
-        """
-        """
-        dict_={"au":"au", "a.u.":"au", "bohr":"au", "angstrom":"angstrom"}
-        if dict_[self.coord_unit.lower()]==dict_[out.lower()]:
-            print("The coordinates are already in "+out)
-        elif dict_[self.coord_unit.lower()]=="angstrom" and dict_[out.lower()]=="au":
-            self.inp_coords=np.multiply(1,88973,self.inp_coords)
-            self.coord_unit="au"
-            print("coordinates changes from "+self.coord_unit+"to "+out)
-        elif dict_[self.coord_unit.lower()]=="au" and dict_[out.lower()]=="angstrom":
-            self.inp_coords=np.multiply(0.529177,self.inp_coords)
-            self.coord_unit="angstrom"
-            print("coordinates changes from "+self.coord_unit+"to "+out)
-        else:
-            print("Unit combination not implemented yet. Why don't you do it?")
+
+        
 def calculate_charge_dipole(g, method, charge=0, coords="Angstrom", out="au"):
     """
     Note
