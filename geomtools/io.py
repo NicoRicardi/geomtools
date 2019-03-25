@@ -123,7 +123,7 @@ def read_charge_txt(fnm):
                 break
     return charge_list
 
-def write_xyz(g, fnm, which="inp"):
+def write_xyz(g, fnm, which="inp", decs=6, spacing=4):
     """
     Note
     ----
@@ -137,13 +137,17 @@ def write_xyz(g, fnm, which="inp"):
         name or path of the output file
     which : {"inp", "com"}
         coordinates to write
+    decs : int
+        number of desired decimal digits
+    spacing : int
+        number of empty spaces between coordinates.NB: the "-" sign will take one of these spaces, so values <2 are unadvisable
     """
     with open(fnm,"w") as out:
         out.write(" "+str(len(g.atoms))+"\n\n")
         for i in range(len(g.atoms)):
-            out.write(g.atoms[i]+"    "+"    ".join(map(str,g.coords(which)[i]))+"\n")   
-
-def write_zr(gA, gB, fnm):
+            out.write(g.atoms[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}'.format(g.coords(which)[i][0],g.coords(which)[i][1],g.coords(which)[i][2],w=spacing+decs+1, p=decs)+"\n")
+            
+def write_zr(gA, gB, fnm, decs=6, spacing=4):
     """
     Note
     ----
@@ -157,15 +161,20 @@ def write_zr(gA, gB, fnm):
         geometry of fragment B
     fnm : str
         name or path of the output file
+    decs : int
+        number of desired decimal digits
+    spacing : int
+        number of empty spaces between coordinates.NB: the "-" sign will take one of these spaces, so values <2 are unadvisable
     """
     with open(fnm,"w") as out:
             for i in range(len(gA.atoms)):
-                out.write(gA.atoms[i]+"    "+"    ".join(map(str,gA.inp_coords[i]))+"\n")
+                out.write(gA.atoms[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}'.format(gA.inp_coords[i][0],gA.inp_coords[i][1],gA.inp_coords[i][2],w=spacing+decs+1, p=decs)+"\n")
             out.write("----\n")
             for i in range(len(gB.atoms)):
-                out.write(gB.atoms[i]+"    "+"    ".join(map(str,gB.inp_coords[i]))+"\n")
+                out.write(gB.atoms[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}'.format(gB.inp_coords[i][0],gB.inp_coords[i][1],gB.inp_coords[i][2],w=spacing+decs+1, p=decs)+"\n")
+            
 
-def write_coords(g, fnm, which="inp", inp="Angstrom", out="Angstrom"):
+def write_coords(g, fnm, which="inp", inp="Angstrom", out="Angstrom", decs=6, spacing=4):
     """
     Note
     ----
@@ -183,6 +192,10 @@ def write_coords(g, fnm, which="inp", inp="Angstrom", out="Angstrom"):
         unit of the input, default is Angstrom. NB case insensitive
     out : {"Angstrom","au","a.u.","bohr"}
         unit of the output, default is Angstrom. NB case insensitive
+    decs : int
+        number of desired decimal digits
+    spacing : int
+        number of empty spaces between coordinates.NB: the "-" sign will take one of these spaces, so values <2 are unadvisable
     """
     dict_ = {"angstrom":"angstrom","au":"au","a.u.":"au","bohr":"au"}
     if dict_[inp.lower()]==dict_[out.lower()]:
@@ -193,11 +206,14 @@ def write_coords(g, fnm, which="inp", inp="Angstrom", out="Angstrom"):
         factor=1.88973
     else:
         print("combination of units of measure not implemented yet. Why don't you do it, champ?")
+    coords_to_print=np.multiply(factor,g.coords(which))
     with open(fnm,"w") as out:
         for i in range(len(g.atoms)):
-            out.write(g.atoms[i]+"    "+"    ".join(map(str,np.multiply(factor,g.coords(which)[i])))+"\n")   
+#            out.write(g.atoms[i]+"    "+"    ".join(map(str,np.multiply(factor,g.coords(which)[i])))+"\n")   
+             out.write(g.atoms[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}'.format(coords_to_print[i][0],coords_to_print[i][1],coords_to_print[i][2],w=spacing+decs+1, p=decs)+"\n")
            
-def write_frag_file(fnm,*args,Type="calculate"):
+           
+def write_frag_file(fnm, *args, Type="calculate", decs=6, spacing=4):
     """
     Note
     ----
@@ -211,6 +227,10 @@ def write_frag_file(fnm,*args,Type="calculate"):
         calculate=> args=geom(all fragments)
         list=> args=[frag1,frag2...]
         individual=> args=frag1,frag2...
+    decs : int
+        number of desired decimal digits
+    spacing : int
+        number of empty spaces between coordinates.NB: the "-" sign will take one of these spaces, so values <2 are unadvisable
     """
     from fragments import get_fragments
     if Type=="calculate":
@@ -223,7 +243,8 @@ def write_frag_file(fnm,*args,Type="calculate"):
         print("Go home bro, you're drunk")
     sl=[]
     for i in frag_list:
-        sl.append("\n".join([i.atoms[j]+"    "+"    ".join(map(str,i.inp_coords[j])) for j in range(len(i.atoms))]))
+        sl.append("\n".join([i.atoms[j]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}'.format(i.inp_coords[j][0],i.inp_coords[j][1],i.inp_coords[j][2],w=spacing+decs+1, p=decs) for j in range(len(i.atoms))]))
+#        sl.append("\n".join([i.atoms[j]+"    "+"    ".join(map(str,i.inp_coords[j])) for j in range(len(i.atoms))]))
     with open(fnm,"w") as out:
         out.write(("\n--\n").join(sl))
         

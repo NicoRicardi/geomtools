@@ -27,6 +27,21 @@ class geom:
         self.inp_coords = inp_coords
         self.coord_unit = coord_unit
         
+    def from_xyz(fnm):
+        """
+        Parameters
+        ----------
+        fnm : str
+            name or path to the .xyz file
+        
+        Returns
+        -------
+        geom
+            geometry object from the .xyz file
+        """
+        from geomtools.io import read_xyz
+        return read_xyz(fnm)
+    
     def get_com(self):
         """
         Note
@@ -167,6 +182,14 @@ class geom:
     
     def change_coord_unit(self,out):
         """
+        Note
+        ----
+        Changes the unit of inp_coords
+        
+        Parameters
+        ----------
+        out : str
+            desired unit for the output. Handles cases properly and au/a.u./bohr
         """
         dict_={"au":"au", "a.u.":"au", "bohr":"au", "angstrom":"angstrom"}
         if dict_[self.coord_unit.lower()]==dict_[out.lower()]:
@@ -181,6 +204,28 @@ class geom:
             print("coordinates changes from "+self.coord_unit+"to "+out)
         else:
             print("Unit combination not implemented yet. Why don't you do it?")
+            
+    def reorder(self,o):
+        """
+        Parameters
+        ----------
+        o : list
+            new order of the geometry
+        
+        Returns
+        -------
+        geom
+            geometry in the new order
+        """
+        return geom(self.atoms[o],self.inp_coords[o])
+    
+    def xyz(self,fnm, which="inp", decimals=6, spaces=4):
+        """
+        Does not work yet. Do not know why
+        """
+        from geomtools.io import write_xyz
+        write_xyz(self,which,decs=decimals,spacing=spaces)
+           
 def calculate_charge_dipole(g, method, charge=0, coords="Angstrom", out="au"):
     """
     Note
@@ -219,3 +264,133 @@ def calculate_charge_dipole(g, method, charge=0, coords="Angstrom", out="au"):
     if dict_[out.lower()]=="debye":
         d=np.divide(d,0.393456)
     return d 
+
+class plane:
+    """
+    Note
+    ----
+    Plane object that stores the parameters for the plane equation
+    """
+    def __init__(self,A,B,C,D):
+        """
+        Parameters
+        ----------
+        A : float 
+            or anything that can be turned into a float
+        B : float 
+            or anything that can be turned into a float
+        C : float 
+            or anything that can be turned into a float
+        D : float 
+            or anything that can be turned into a float
+        Note
+        ----
+        Uses equation form Ax + By + Cz + D = 0
+        """
+        self.A=float(A)
+        self.B=float(B)
+        self.C=float(C)
+        self.D=float(D)
+        
+    def eq(self):
+        """
+        Note
+        ----
+        prints the equation of the plane object
+        """
+        print("{:.2f}*x + {:.2f}*y + {:.2f}*z + {:.2f} = 0".format(self.A,self.B,self.C,self.D))
+    
+    @classmethod
+    def normal_to(cls,v,P=[0,0,0]):
+        """
+        Parameters
+        ----------
+        v : array(3)
+            vector the plane needs to be perpendicular to
+        P : array(3)
+            point that the plane needs to pass by. default is the origin
+        
+        Returns
+        ------
+        plane object perpendicular to v and passing by P
+        """
+        A=v[0]
+        B=v[1]
+        C=v[2]
+        D=-A*P[0]-B*P[1]-C*P[2]
+        return cls(A,B,C,D)
+    
+    @classmethod
+    def by_three_points(cls,pointarray):
+        """
+        Parameters
+        ----------
+        pointarray : array(3,3)
+        
+        Returns
+        ------
+        plane object passing by the three points
+        """
+        n=np.cross(pointarray[1]-pointarray[0],pointarray[1]-pointarray[2])
+        A=n[0]
+        B=n[1]
+        C=n[2]  
+        P=pointarray[1]
+        D=-A*P[0]-B*P[1]-C*P[2]
+        return cls(A,B,C,D)
+    
+    def get_norm(self):
+        """
+        Returns
+        -------
+        array(3)
+            the norm of the plane
+        """
+        if not hasattr(self,"norm"):
+            self.norm=[self.A,self.B,self.C]
+        return self.norm
+    
+    def get_unorm(self):
+        """
+        Returns
+        -------
+        array(3)
+            the norm of the plane, as a unitary vector
+        """
+        from geomtools.transformations import uvec
+        if not hasattr(self,"unorm"):
+            self.unorm=uvec([self.A,self.B,self.C])
+        return self.unorm
+        
+    def dist_from_point(self,p,signed=False):
+        """
+        Parameters
+        ----------
+        p : array(3)
+            point to calculate the distance from
+        signed : bool
+            wether the distance should be signed or absolute
+        
+        Returns
+        -------
+        float
+            the distance from p to the plane
+        """
+        num=np.add(np.add(np.add(np.multiply(self.A,p[0]),np.multiply(self.B,p[1])),np.multiply(self.C,p[2])),self.D)
+        if not signed:
+            num=abs(num)
+        den=np.linalg.norm([self.A,self.B,self.C])
+#        d=np.divide(np.add(np.add(np.add(np.multiply(self.A,p[0]),np.multiply(self.B,p[1])),np.multiply(self.C,p[2])),self.D),np.linalg.norm([self.A,self.B,self.C]))
+        return np.divide(num,den)
+   
+    def symmetric_point(self,p):
+        """
+        p : array(3)
+            point we need the symmetric of
+        
+        Returns
+        -------
+        array(3)
+            the symmetric point
+        """
+        return np.add(p,np.multiply(self.get_unorm(),np.multiply(-2,self.dist_from_point(p,signed=True))))

@@ -80,7 +80,7 @@ def transl_back(g2A, g2B, g1):     #todo: Maybe redo with Kabsch?
         g2At=transl(g2A,np.subtract(g1.get_com(),g2B.get_com()))
     return (g2At,g2Bt)
 
-def rot_ax(g, ax, x, which = "com"): #todo: check if np.asmatrix can be avoided, implement for vector
+def rot_ax(g, ax, x, which = "com", angle_unit = "deg"): #todo: check if np.asmatrix can be avoided, implement for vector
     """
     Parameters
     ----------
@@ -89,10 +89,11 @@ def rot_ax(g, ax, x, which = "com"): #todo: check if np.asmatrix can be avoided,
     ax : array(3)
         axis(vector) to rotate around
     x : float
-        angle to rotate of
+        angle to rotate of, in deg or grad
     which : {"com", "inp"}
         coordinates to rotate, default is com
-        
+    angle_unit :{"deg", "grad"}
+        unit for the angle, default is degree
     Returns
     geom
         rotated geometry
@@ -100,13 +101,19 @@ def rot_ax(g, ax, x, which = "com"): #todo: check if np.asmatrix can be avoided,
     """
     if np.linalg.norm(ax)!=1:
         ax=uvec(ax)
+    if angle_unit=="deg":
+        x=np.divide(np.multiply(x,np.pi),180)
+    elif angle_unit=="rad":
+        pass
+    else:
+        print("This unit for angles is not implemented yet. Why don't you do it, champ?")
     out=np.add(np.multiply(g.coords(which),np.cos(x)),
     np.add((np.multiply(np.asmatrix(ax).T,np.multiply(np.asmatrix(np.dot(g.coords(which),ax)),np.subtract(1,np.cos(x))))).T,
     np.multiply(np.cross(ax,g.coords(which)),np.sin(x))))
     return geom(g.atoms,np.asarray(out))
 
 
-def find_rot(g2, g1, thresh=0.00000001):
+def find_rot(g2, g1, thresh=0.00000001,angle_unit="deg"):
     """
     Parameters
     ----------
@@ -116,7 +123,9 @@ def find_rot(g2, g1, thresh=0.00000001):
         initial geometry
     thresh : float
         threshold distance below which two points are considered equivalent, default is 0.00000001
-    
+    angle_unit :{"deg", "grad"}
+        unit for the angles, default is degree
+        
     Returns
     -------
     tuple
@@ -156,6 +165,9 @@ def find_rot(g2, g1, thresh=0.00000001):
         else:
             Vb=Va
             Th_b=0
+        if angle_unit=="deg":
+            Th_a=np.divide(np.multiply(Th_a,180),np.pi)
+            Th_b=np.divide(np.multiply(Th_b,180),np.pi)
     return (Th_a, Th_b, Va, Vb)
 
 def rmsd(V, W):
@@ -281,3 +293,15 @@ def kabsch(g1, g2, which="com"):
     U = np.dot(V, W)
 
     return U
+
+def apply_planar_symm(g,plane):
+    s=geom(g.atoms,np.zeros([len(g.atoms),3]))
+    for n,atom in enumerate(g.inp_coords):
+        s.inp_coords[n]=plane.symmetric_point(atom)
+    return s
+
+def apply_point_symm(g,point):
+    s=geom(g.atoms,np.zeros([len(g.atoms),3]))
+    for n,atom in enumerate(g.inp_coords):
+        s.inp_coords[n]=np.subtract(np.multiply(2,point),atom)
+    return s    

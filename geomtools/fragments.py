@@ -5,7 +5,7 @@ Contains anything related to analysis of distances, ordering, and combining/divi
 """
 import numpy as np
 import sys
-from geom import geom
+from geomtools.geom import geom
 
 def mix_geoms(g1, g2, which1="inp", which2="inp", ratio=0.5,):
     """
@@ -32,7 +32,7 @@ def mix_geoms(g1, g2, which1="inp", which2="inp", ratio=0.5,):
     """
     if (g1.atoms!=g2.atoms).all():
         print("The two geometries do not have the same atoms!!")    #Check if geometries have the same atom list
-    return geom(g1.atoms(),np.add(np.multiply(ratio,g1.coords(which1)),np.multiply(1-ratio,g2.coords(which2))))
+    return geom(g1.atoms,np.add(np.multiply(ratio,g1.coords(which1)),np.multiply(1-ratio,g2.coords(which2))))
                 
 def dist_order(g, which="com"):
     """
@@ -185,10 +185,13 @@ def get_bond_matrix(g): #todo: sum of vdw radii
     import mendeleev as md
     DM, row_ord =get_ordd_dist_mat(g)
     BM=np.zeros([len(row_ord),len(row_ord)])
+#    for i in range(len(row_ord)):
+#        for j in range(len(row_ord)):
+#            R_i, R_j = np.multiply(0.01,md.element(g.atoms[row_ord][i]).vdw_radius), np.multiply(0.01,md.element(g.atoms[row_ord][j]).vdw_radius)
+#            BM[i][j]=(DM[i][j] < R_i + R_j)
     for i in range(len(row_ord)):
-        for j in range(len(row_ord)):
-            R_i, R_j = np.multiply(0.01,md.element(g.atoms[row_ord][i]).vdw_radius), np.multiply(0.01,md.element(g.atoms[row_ord][j]).vdw_radius)
-            BM[i][j]=(DM[i][j] < R_i + R_j)
+        R_i = np.multiply(0.01,md.element(g.atoms[row_ord][i]).vdw_radius)
+        BM[i]=(DM[i] < R_i)
     return (BM, row_ord)
 
 def comb_geoms(*args,List=False):
