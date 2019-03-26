@@ -219,12 +219,12 @@ class geom:
         """
         return geom(self.atoms[o],self.inp_coords[o])
     
-    def xyz(self,fnm, which="inp", decimals=6, spaces=4):
+    def to_xyz(self, fnm, which="inp", decimals=6, spaces=4):
         """
         Does not work yet. Do not know why
         """
         from geomtools.io import write_xyz
-        write_xyz(self,which,decs=decimals,spacing=spaces)
+        write_xyz(self, fnm, which, decs=decimals, spacing=spaces)
            
 def calculate_charge_dipole(g, method, charge=0, coords="Angstrom", out="au"):
     """
