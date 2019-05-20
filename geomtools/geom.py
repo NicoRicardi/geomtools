@@ -195,13 +195,13 @@ class geom:
         if dict_[self.coord_unit.lower()]==dict_[out.lower()]:
             print("The coordinates are already in "+out)
         elif dict_[self.coord_unit.lower()]=="angstrom" and dict_[out.lower()]=="au":
-            self.inp_coords=np.multiply(1,88973,self.inp_coords)
+            print("changing coordinates from "+self.coord_unit+" to "+out)
+            self.inp_coords=np.multiply(1.88973,self.inp_coords)
             self.coord_unit="au"
-            print("coordinates changes from "+self.coord_unit+"to "+out)
         elif dict_[self.coord_unit.lower()]=="au" and dict_[out.lower()]=="angstrom":
+            print("changing coordinates from "+self.coord_unit+" to "+out)
             self.inp_coords=np.multiply(0.529177,self.inp_coords)
             self.coord_unit="angstrom"
-            print("coordinates changes from "+self.coord_unit+"to "+out)
         else:
             print("Unit combination not implemented yet. Why don't you do it?")
             

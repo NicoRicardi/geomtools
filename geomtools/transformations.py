@@ -58,6 +58,36 @@ def uvec(vec):
     """
     return np.divide(vec,np.linalg.norm(vec))
 
+def get_angle(v1, v2, unit="deg"):
+    """
+    Parameters
+    ----------
+    v1: array(3)
+        vector1
+    v2: array(3)
+        vector2
+    unit: {"deg", "rad"}
+        desired unit for the angle, default is "deg"
+    
+    Returns
+    -------
+    float
+        angle between v1 and v2        
+    """
+    dot = np.dot(v1, v2)
+    den = np.multiply(np.linalg.norm(v1), np.linalg.norm(v2))
+    frac=np.divide(dot, den)
+    if frac<-1.0:
+        frac=-1.0
+    angle = np.arccos(frac)
+    if unit=="deg":
+        angle=np.divide(np.multiply(angle,180),np.pi)
+    elif unit=="rad":
+        pass
+    else:
+        print("This unit for angles is not implemented yet. Why don't you do it, champ?")
+    return angle
+
 def transl_back(g2A, g2B, g1):     #todo: Maybe redo with Kabsch?
     """
     Parameters
@@ -92,7 +122,7 @@ def rot_ax(g, ax, x, which = "com", angle_unit = "deg"): #todo: check if np.asma
         angle to rotate of, in deg or grad
     which : {"com", "inp"}
         coordinates to rotate, default is com
-    angle_unit :{"deg", "grad"}
+    angle_unit : {"deg", "grad"}
         unit for the angle, default is degree
     Returns
     geom
@@ -112,7 +142,26 @@ def rot_ax(g, ax, x, which = "com", angle_unit = "deg"): #todo: check if np.asma
     np.multiply(np.cross(ax,g.coords(which)),np.sin(x))))
     return geom(g.atoms,np.asarray(out))
 
-
+def align_vec(v1,v2,unit="deg"):
+    """
+    Parameters
+    ----------
+    v1: array(3)
+        vector1
+    v2: array(3)
+        vector2
+    unit: {"deg", "rad"}
+        desired unit for the angle, default is "deg"
+    
+    Returns
+    -------
+    tuple
+        ax: axis for the rotation, x: angle for the rotation
+    """
+    x = get_angle(v1, v2,unit=unit)
+    ax = np.cross(v1,v2)
+    return (ax,x)
+    
 def find_rot(g2, g1, thresh=0.00000001,angle_unit="deg"):
     """
     Parameters
@@ -136,25 +185,27 @@ def find_rot(g2, g1, thresh=0.00000001,angle_unit="deg"):
     else:
         first=0
         add=1
-        while np.linalg.norm(g1.get_com_coords()[first]) < thresh :
+        while np.linalg.norm(g1.get_com_coords()[first]) < thresh : #Skip atoms if they are "on" the center of mass
             first+=1
-        while np.linalg.norm(g1.get_com_coords()[first+add]) < thresh or \
-        np.linalg.norm(np.cross(g1.get_com_coords()[first],g1.get_com_coords()[first+add])) < thresh:
-            add+=1
+        #Skip atoms if they are "on" the center of mass
+        while np.linalg.norm(g1.get_com_coords()[first+add]) < thresh \
+        or np.linalg.norm(np.cross(g1.get_com_coords()[first],g1.get_com_coords()[first+add])) < thresh: #Skip aligned atoms
+            add+=1 
         A1, A2 = uvec(g1.get_com_coords()[first]), uvec(g2.get_com_coords()[first])
         cross1=np.cross(A1,A2)
-        if np.linalg.norm(cross1) < thresh:
+        #TODO check if they are very close
+        if np.linalg.norm(cross1) < thresh: #if symmetric with respect to c.o.m. 
             Th_a = np.pi
             Va = uvec(np.cross(A1,g1.get_com_coords()[first+1]))
         else:
             Va = uvec(cross1)
             Th_a=np.arccos(np.dot(A1,A2))
         
-        g1or1 =rot_ax(g1, Va, Th_a)
+        g1or1 =rot_ax(g1, Va, Th_a) #geometry after first rotation
         if (g1or1.get_com_coords() != g2.get_com_coords()).all():        
-            A1r=g1or1.get_com_coords()[first]
-            s1, s2 = uvec(g1or1.get_com_coords()[first+1]), uvec(g2.get_com_coords()[first+1])
-            B1, B2 = uvec(np.cross(A1r,s1)), uvec(np.cross(A2,s2))
+            A1r=g1or1.get_com_coords()[first] #A1 after first rotation
+            s1, s2 = uvec(g1or1.get_com_coords()[first+1]), uvec(g2.get_com_coords()[first+1])  #auxiliary vectors to obtain B
+            B1, B2 = uvec(np.cross(A1r,s1)), uvec(np.cross(A2,s2))  #vector B, made so to be perpendicular to A
             cross2=np.cross(B1,B2)
             if np.linalg.norm(cross2) < thresh:
                 Vb=uvec(A1r)
@@ -162,12 +213,12 @@ def find_rot(g2, g1, thresh=0.00000001,angle_unit="deg"):
             else:
                 Vb = uvec(cross2)
                 Th_b=np.arccos(np.dot(B1,B2))
-        else:
+        else: #if one rotation is enough, then second rotation is 0°
             Vb=Va
             Th_b=0
-        if angle_unit=="deg":
-            Th_a=np.divide(np.multiply(Th_a,180),np.pi)
-            Th_b=np.divide(np.multiply(Th_b,180),np.pi)
+        if angle_unit=="deg":   #adjust units
+            Th_a=np.divide(np.multiply(Th_a,np.pi),180)
+            Th_b=np.divide(np.multiply(Th_b,np.pi),180)
     return (Th_a, Th_b, Va, Vb)
 
 def rmsd(V, W):
