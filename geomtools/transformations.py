@@ -5,6 +5,7 @@ Contains all geometric transformations: translations, rotations,etc...
 """
 import numpy as np
 from geomtools.geom import geom
+import sys
 
 def find_center(geom):
     """
@@ -24,10 +25,10 @@ def find_center(geom):
     for i in range(len(geom.atoms)):
         atom_contrib=md.element(geom.atoms[i]).atomic_weight
         tot=np.add(tot,atom_contrib)
-        num=np.add(num,np.multiply(atom_contrib,geom.inp_coords[i]))
+        num=np.add(num,np.multiply(atom_contrib,geom.coords[i]))
     return np.divide(num,tot)
 
-def transl(g, vect, which="inp"):
+def transl(g, vect):
     """
     Parameters
     ----------
@@ -35,14 +36,31 @@ def transl(g, vect, which="inp"):
         geometry to apply the transition to
     vect : array(3)
         translation vector to apply
-    which : {"inp", "com"}
-        coordinates to translate, default is inp
+        
     Returns
     -------
     geom
         geometry object where inp_coords are the results of the translation
     """
-    return geom(g.atoms, np.add(g.coords(which),vect))
+    gt=g.copy()
+    gt.transl(vect)
+    return gt
+
+def center(g):
+    """
+    Parameters
+    ----------
+    g : geom
+        geometry to center
+        
+    Returns
+    -------
+    geom
+        centered geometry
+    """
+    copy=g.copy()
+    copy.center()
+    return copy
 
 def uvec(vec):
     """
@@ -98,19 +116,20 @@ def transl_back(g2A, g2B, g1):     #todo: Maybe redo with Kabsch?
         geometry of fragment B in the roto-translated complex
     g1 : geom
         original/reference geometry of fragment B
+        
     Returns
     -------
     tuple
         (geometry of fragment A translated so that geom(B)==g1, geometry of B (translated back, i.e. geom(B)==g1))
     """
-    if (g1.atoms!=g2B.atoms).all():
-        print("The two geometries do not have the same atoms!!")    #Check if geometries have the same atom list
-    else:
-        g2Bt=transl(g2B,np.subtract(g1.get_com(),g2B.get_com()))
-        g2At=transl(g2A,np.subtract(g1.get_com(),g2B.get_com()))
+    from geomtools.geom import check_same_atoms,check_same_unit
+    check_same_atoms(g1,g2B)
+    check_same_unit(g1,g2B)
+    g2Bt=transl(g2B,np.subtract(g1.get_com(),g2B.get_com()))
+    g2At=transl(g2A,np.subtract(g1.get_com(),g2B.get_com()))
     return (g2At,g2Bt)
 
-def rot_ax(g, ax, x, which = "com", angle_unit = "deg"): #todo: check if np.asmatrix can be avoided, implement for vector
+def rot_ax(g, ax, x, angle_unit = "deg"): #todo: check if np.asmatrix can be avoided, implement for vector
     """
     Parameters
     ----------
@@ -119,28 +138,34 @@ def rot_ax(g, ax, x, which = "com", angle_unit = "deg"): #todo: check if np.asma
     ax : array(3)
         axis(vector) to rotate around
     x : float
-        angle to rotate of, in deg or grad
-    which : {"com", "inp"}
-        coordinates to rotate, default is com
-    angle_unit : {"deg", "grad"}
+        angle to rotate of, in deg or rad
+    angle_unit : {"deg", "rad"}
         unit for the angle, default is degree
+        
     Returns
+    -------
     geom
         rotated geometry
-    -------
     """
-    if np.linalg.norm(ax)!=1:
-        ax=uvec(ax)
-    if angle_unit=="deg":
-        x=np.divide(np.multiply(x,np.pi),180)
-    elif angle_unit=="rad":
-        pass
-    else:
-        print("This unit for angles is not implemented yet. Why don't you do it, champ?")
-    out=np.add(np.multiply(g.coords(which),np.cos(x)),
-    np.add((np.multiply(np.asmatrix(ax).T,np.multiply(np.asmatrix(np.dot(g.coords(which),ax)),np.subtract(1,np.cos(x))))).T,
-    np.multiply(np.cross(ax,g.coords(which)),np.sin(x))))
-    return geom(g.atoms,np.asarray(out))
+    return g.rot_ax(ax, x, angle_unit = "deg")
+
+def rot_matrix(g,M):
+    """
+    Rotate geometry g with matrix M
+
+    Parameters
+    ----------
+    g : geometry object
+        geometry to rotate
+    M : np.array(3,3)
+        rotation matrix
+        
+    Returns
+    -------
+    geom
+        rotated geometry
+    """
+    return g.rot_matrix(M)
 
 def align_vec(v1,v2,unit="deg"):
     """
@@ -164,6 +189,10 @@ def align_vec(v1,v2,unit="deg"):
     
 def find_rot(g2, g1, thresh=0.00000001,angle_unit="deg"):
     """
+    Note
+    ----
+    Works if geometries are exactly the same. Consider using kabsch_find_rot
+    
     Parameters
     ----------
     g2 : geom
@@ -172,7 +201,7 @@ def find_rot(g2, g1, thresh=0.00000001,angle_unit="deg"):
         initial geometry
     thresh : float
         threshold distance below which two points are considered equivalent, default is 0.00000001
-    angle_unit :{"deg", "grad"}
+    angle_unit :{"deg", "rad"}
         unit for the angles, default is degree
         
     Returns
@@ -180,63 +209,69 @@ def find_rot(g2, g1, thresh=0.00000001,angle_unit="deg"):
     tuple
         (angle for the first rotation, angle for the second rotation, axis for the first rotation, axis for the second rotation)
     """
-    if (g1.atoms!=g2.atoms).all():    #Check if geometries have the same atom list
-        print("The two geometries do not have the same atoms!!")
+    from geomtools.geom import check_same_atoms,check_same_unit
+    check_same_atoms(g1,g2)
+    check_same_unit(g1,g2)
+    first=0
+    add=1
+    while np.linalg.norm(g1.coords[first]) < thresh : #Skip atoms if they are "on" the center of mass
+        first+=1
+    #Skip atoms if they are "on" the center of mass
+    while np.linalg.norm(g1.coords[first+add]) < thresh \
+    or np.linalg.norm(np.cross(g1.coords[first],g1.coords[first+add])) < thresh: #Skip aligned atoms
+        add+=1 
+    A1, A2 = uvec(g1.coords[first]), uvec(g2.coords[first])
+    cross1=np.cross(A1,A2)
+    #TODO check if they are very close
+    if np.linalg.norm(cross1) < thresh: #if symmetric with respect to c.o.m. 
+        Th_a = np.pi
+        Va = uvec(np.cross(A1,g1.coords[first+1]))
     else:
-        first=0
-        add=1
-        while np.linalg.norm(g1.get_com_coords()[first]) < thresh : #Skip atoms if they are "on" the center of mass
-            first+=1
-        #Skip atoms if they are "on" the center of mass
-        while np.linalg.norm(g1.get_com_coords()[first+add]) < thresh \
-        or np.linalg.norm(np.cross(g1.get_com_coords()[first],g1.get_com_coords()[first+add])) < thresh: #Skip aligned atoms
-            add+=1 
-        A1, A2 = uvec(g1.get_com_coords()[first]), uvec(g2.get_com_coords()[first])
-        cross1=np.cross(A1,A2)
-        #TODO check if they are very close
-        if np.linalg.norm(cross1) < thresh: #if symmetric with respect to c.o.m. 
-            Th_a = np.pi
-            Va = uvec(np.cross(A1,g1.get_com_coords()[first+1]))
+        Va = uvec(cross1)
+        Th_a=np.arccos(np.dot(A1,A2))
+    
+    g1or1 =rot_ax(g1, Va, Th_a,angle_unit="rad") #geometry after first rotation
+    if (g1or1.coords != g2.coords).all():        
+        A1r=g1or1.coords[first] #A1 after first rotation
+        s1, s2 = uvec(g1or1.coords[first+1]), uvec(g2.coords[first+1])  #auxiliary vectors to obtain B
+        B1, B2 = uvec(np.cross(A1r,s1)), uvec(np.cross(A2,s2))  #vector B, made so to be perpendicular to A
+        cross2=np.cross(B1,B2)
+        if np.linalg.norm(cross2) < thresh:
+            Vb=uvec(A1r)
+            Th_b=np.pi
         else:
-            Va = uvec(cross1)
-            Th_a=np.arccos(np.dot(A1,A2))
-        
-        g1or1 =rot_ax(g1, Va, Th_a) #geometry after first rotation
-        if (g1or1.get_com_coords() != g2.get_com_coords()).all():        
-            A1r=g1or1.get_com_coords()[first] #A1 after first rotation
-            s1, s2 = uvec(g1or1.get_com_coords()[first+1]), uvec(g2.get_com_coords()[first+1])  #auxiliary vectors to obtain B
-            B1, B2 = uvec(np.cross(A1r,s1)), uvec(np.cross(A2,s2))  #vector B, made so to be perpendicular to A
-            cross2=np.cross(B1,B2)
-            if np.linalg.norm(cross2) < thresh:
-                Vb=uvec(A1r)
-                Th_b=np.pi
-            else:
-                Vb = uvec(cross2)
-                Th_b=np.arccos(np.dot(B1,B2))
-        else: #if one rotation is enough, then second rotation is 0°
-            Vb=Va
-            Th_b=0
-        if angle_unit=="deg":   #adjust units
-            Th_a=np.divide(np.multiply(Th_a,np.pi),180)
-            Th_b=np.divide(np.multiply(Th_b,np.pi),180)
+            Vb = uvec(cross2)
+            Th_b=np.arccos(np.dot(B1,B2))
+    else: #if one rotation is enough, then second rotation is 0°
+        Vb=Va
+        Th_b=0
+    if angle_unit=="deg":   #adjust units
+        Th_a=np.divide(np.multiply(Th_a,np.pi),180)
+        Th_b=np.divide(np.multiply(Th_b,np.pi),180)
     return (Th_a, Th_b, Va, Vb)
 
 def rmsd(V, W):
     """
-    Calculate Root-mean-square deviation from two sets of vectors V and W.
+    Note
+    ----
+    Calculate Root-mean-square deviation between two geometries.
+    NB reads both np.array(coords) or geom.
 
     Parameters
     ----------
-    V : array
+    V : array or geom
         (N,D) matrix, where N is points and D is dimension.
-    W : array
+    W : array or geom
         (N,D) matrix, where N is points and D is dimension.
 
     Returns
     -------
-    rmsd : float
+    float
         Root-mean-square deviation between the two vectors
     """
+    for i in [V,W]:
+        if type(i)==geom:
+            i=i.coords
     D = len(V[0])
     N = len(V)
     result = 0.0
@@ -245,57 +280,73 @@ def rmsd(V, W):
     return np.sqrt(result/N)
 
 
-def kabsch_rmsd(g1, g2,which="com"):
+def kabsch_rmsd(g1, g2):
     """
-    Rotate matrix P unto Q using Kabsch algorithm and calculate the RMSD.
-
+    Note
+    ----
+    Rotate geometry P unto Q using Kabsch algorithm and calculate the RMSD.
+    NB reads both np.array(coords) or geom
+    
     Parameters
     ----------
-    P : array
-        (N,D) matrix, where N is points and D is dimension.
-    Q : array
-        (N,D) matrix, where N is points and D is dimension.
-    which : {"inp", "com"}
-        coordinates to use, default is com
-
-    Returns
-    -------
-    rmsd : float
-        root-mean squared deviation
-    """
-    g1 = kabsch_rotate(g1, g2,which)
-    return rmsd(g1.coords(which), g2.coords(which))
-
-
-def kabsch_rotate(g1, g2,which="com"):
-    """
-    Rotate matrix P unto matrix Q using Kabsch algorithm.
-
-    Parameters
-    ----------
-    P : array
-        (N,D) matrix, where N is points and D is dimension.
-    Q : array
-        (N,D) matrix, where N is points and D is dimension.
-    which : {"inp", "com"}
-        coordinates to use, default is com
+    P : array or geom
+        (Natoms,3) coord array
+    Q : array or geom
+        (Natoms,3) coord array 
         
     Returns
     -------
-    P : array
-        (N,D) matrix, where N is points and D is dimension,
+    float
+        root-mean squared deviation
+    """
+    for i in [g1,g2]:
+        if type(i)==geom:
+            i=i.coords
+    g1 = kabsch_rotate(g1, g2)
+    return rmsd(g1, g2)
+
+
+def kabsch_rotate(g1, g2):
+    """
+    Note
+    ----
+    Rotate geometry P unto matrix Q using Kabsch algorithm.
+    NB reads both np.array(coords) or geom
+    
+    Parameters
+    ----------
+    P : array or geom
+        (Natoms,3) coord array
+    Q : array or geom
+        (Natoms,3) coord array
+        
+    Returns
+    -------
+    array(N,D) or geom
+        (Natoms,3) coord array,
         rotated
 
     """
-    U = kabsch(g1, g2,which)
+    c=[]
+    for i in [g1,g2]:
+        if type(i)==geom:
+            c.append(i.coords)
+        else:
+            c.append(i)
+    U = kabsch_find_rot(c[0], c[1])
 
     # Rotate P
-    P = np.dot(g1.coords(which), U)
-    return geom(g1.atoms,P)
+    if type(g1)==geom:
+        out=rot_matrix(g1,U)
+    else:
+        out = np.dot(c[0], U)
+    return out
 
 
-def kabsch(g1, g2, which="com"):
+def kabsch_find_rot(g1, g2):
     """
+    Note
+    ----
     Using the Kabsch algorithm with two sets of paired point P and Q, centered
     around the centroid. Each vector set is represented as an NxD
     matrix, where D is the the dimension of the space.
@@ -311,20 +362,20 @@ def kabsch(g1, g2, which="com"):
     Parameters
     ----------
     P : array
-        (N,D) matrix, where N is points and D is dimension.
+        (Natoms,3) coord array
     Q : array
-        (N,D) matrix, where N is points and D is dimension.
-    which : {"inp", "com"}
-        coordinates to use, default is com
+        (Natoms,3) coord array
         
     Returns
     -------
-    U : matrix
-        Rotation matrix (D,D)
+    array(3,3)
+        Rotation matrix (3,3)
     """
-
+    for i in [g1,g2]:
+        if type(i)==geom:
+            i=i.coords
     # Computation of the covariance matrix
-    C = np.dot(np.transpose(g1.coords(which)), g2.coords(which))
+    C = np.dot(np.transpose(g1), g2)
 
     # Computation of the optimal rotation matrix
     # This can be done using singular value decomposition (SVD)
@@ -346,13 +397,53 @@ def kabsch(g1, g2, which="com"):
     return U
 
 def apply_planar_symm(g,plane):
+    """
+    Parameters
+    ----------
+    g : geom object
+        the geometry to apply the transformation to
+    plane : plane object
+        the symmetry plane 
+    
+    Returns
+    -------
+    geom object
+        the transformed geometry
+    """
     s=geom(g.atoms,np.zeros([len(g.atoms),3]))
-    for n,atom in enumerate(g.inp_coords):
-        s.inp_coords[n]=plane.symmetric_point(atom)
+    for n,atom in enumerate(g.coords):
+        s.coords[n]=plane.symmetric_point(atom)
     return s
 
 def apply_point_symm(g,point):
+    """
+    Parameters
+    ----------
+    g : geom object
+        the geometry to apply the transformation to
+    point : array(3) or list of lenght 3
+        coordinates of the inversion center 
+    
+    Returns
+    -------
+    geom object
+        the transformed geometry
+    """
+    if type(point)==list:
+        point=np.asarray(point)
+    elif type(point)==np.ndarray:
+        if len(point.shape)==1:
+            pass
+        elif len(point.shape)==2:
+            if 1 in point.shape:
+                a=point.shape.index(1)
+                point.reshape(point.shape[0 if a==1 else 1])
+            else:
+               print("2D array!! only give the charges as a list, (n,) or (n,1) or (1,n) array!")
+               sys.exit() 
+        else:
+            raise geom.otherError("Array with more than 2 axes!! Give point as listor as array of shape: (3,),(3,1),(1,3)")
     s=geom(g.atoms,np.zeros([len(g.atoms),3]))
-    for n,atom in enumerate(g.inp_coords):
-        s.inp_coords[n]=np.subtract(np.multiply(2,point),atom)
+    for n,atom in enumerate(g.coords):
+        s.coords[n]=np.subtract(np.multiply(2,point),atom)
     return s    

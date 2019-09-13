@@ -4,7 +4,59 @@
 Contains the class "geom"
 """
 import numpy as np
-import sys
+#import sys
+
+class Error(Exception):
+    """Base class for exceptions in this module."""
+    pass
+
+class NatomsError(Error):
+    """Mismatch in the number of atoms.
+
+    Attributes:
+        expression -- input expression in which the error occurred
+        message -- explanation of the error
+    """
+
+    def __init__(self):
+        self.message = "Mismatch in atom number!!"
+        print(self.message)
+        
+class atomsError(Error):
+    """Mismatch in the atom labels.
+
+    Attributes:
+        expression -- input expression in which the error occurred
+        message -- explanation of the error
+    """
+
+    def __init__(self):
+        self.message = "Mismatch in atom labels!!"
+        print(self.message)
+        
+class unitError(Error):
+    """Mismatch in the units.
+
+    Attributes:
+        expression -- input expression in which the error occurred
+        message -- explanation of the error
+    """
+
+    def __init__(self):
+        self.message = "Mismatch in unit!!"
+        print(self.message)
+        
+class otherError(Error):
+    """Mismatch in the units.
+
+    Attributes:
+        expression -- input expression in which the error occurred
+        message -- explanation of the error
+    """
+
+    def __init__(self,message):
+        self.message = message
+        print(self.message)
 
 class geom:
     """
@@ -12,21 +64,249 @@ class geom:
     ----
     Geometry object that contains atom labels and one or more set of coordinates for the molecule(s)
     """
-    def __init__(self, atoms, inp_coords, coord_unit="Angstrom"):
+    def __init__(self, atoms, coords, coord_unit="Angstrom", charges_dict={}):
         """
         Parameters
         ----------
         atoms : array(Natoms)
             Element symbols for the atoms
-        inp_coords : array(3,Natoms) *check*
+        coords : array(Natoms,3)
             x,y,z coordinates for each atom
         coord_unit : str
             unit for coordinates, defaults is Angstrom 
+        charges_dict: dict
+            keys=method(s) values=array of charges
         """
         self.atoms = atoms
-        self.inp_coords = inp_coords
-        self.coord_unit = coord_unit
+        self.coords = coords
+        self.coord_unit = coord_unit.lower()
+        self.charges = charges_dict
+    
+    def __str__(self, spacing=4, decs=6):
+        """
+        Note
+        ----
+        Allows easy printing
         
+        Parameters
+        ----------
+        spacing: int
+            desired spacing between columns
+        decs: int
+            number of decimal digits desired
+        """
+        return "\n".join([self.atoms[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}'.format(self.coords[i][0],self.coords[i][1],self.coords[i][2],w=spacing+decs+1, p=decs) for i in range(len(self.atoms))])
+        
+    def __repr__(self, spacing=4, decs=6):
+        """
+        Note
+        ----
+        Allows easy calling
+        
+        Parameters
+        ----------
+        spacing: int
+            desired spacing between columns
+        decs: int
+            number of decimal digits desired
+        """
+        return "\n".join([self.atoms[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}'.format(self.coords[i][0],self.coords[i][1],self.coords[i][2],w=spacing+decs+1, p=decs) for i in range(len(self.atoms))])
+    
+    def __add__(self, other):
+        """
+        Note
+        ----
+        Allows addition of atoms (e.g. geomC=geomA+geomB). Nb: it returns geomC!
+        
+        Parameters
+        ----------
+        other: geom
+            geometry to add
+        
+        Returns
+        -------
+        geom
+            the total geometry
+        """
+        from fragments import comb_geoms
+        return comb_geoms(self,other)
+    
+    def __iadd__(self, other):
+        """
+        Note
+        ----
+        Allows addition of atoms (e.g. geomA+=geomB). NB: it changes geomA, returns nothing!
+        
+        Parameters
+        ----------
+        other: geom
+            geometry to add
+        """
+        self.add_atoms(other)
+        return self
+        
+    def __sub__(self,vect):
+        """
+        Note
+        ----
+        Allows quick translation (e.g. geomAt=geomA-vect). Nb: it returns geomAt!
+        
+        Parameters
+        ----------
+        vect: array (or list)
+            vector to subtract
+        
+        Returns
+        -------
+        geom
+            the translated geometry
+        """
+        if type(vect)==list:
+            vect=np.asarray(vect)
+        gt=self.copy()
+        gt.transl(-vect)
+        return gt
+    
+    def __isub__(self,vect):
+        """
+        Note
+        ----
+        Allows quick translation (e.g. geomA-=vect). Nb: it changes geomA and returns nothing!
+        
+        Parameters
+        ----------
+        vect: array (or list)
+            vector to subtract
+        """
+        if type(vect)==list:
+            vect=np.asarray(vect)        
+        self.transl(-vect)
+        return self
+        
+    def __eq__(self,other, thresh=1e-6):
+        """
+        Note
+        ----
+        Allows quick comparison (==) of geometries within threshold
+        
+        Parameters
+        ----------
+        other: geom
+            geometry to compare to
+        
+        Returns
+        -------
+        bool
+            whether they are equal or not
+        """
+        self.check_same_unit(other)
+        if len(self.atoms) != len(other.atoms):#Check if geometries have the same atom list
+            return False
+        elif (self.atoms!=other.atoms).all(): #Check if geometries have the same atom list
+            return False
+        else:
+            return (abs(self.coords-other.coords) < thresh).all()
+        
+    def __neq__(self,other, thresh=1e-6):
+        """
+        Note
+        ----
+        Allows quick comparison (!=) of geometries within threshold
+        
+        Parameters
+        ----------
+        other: geom
+            geometry to compare to
+        
+        Returns
+        -------
+        bool
+            whether they are different or not
+        """
+        self.check_same_unit(other)
+        if len(self.atoms) != len(other.atoms):#Check if geometries have the same atom list
+            return True
+        elif (self.atoms!=other.atoms).all(): #Check if geometries have the same atom list
+            return True
+        else:
+            return (abs(self.coords-other.coords) > thresh).any()
+    
+    def have_same_atoms(self,g):
+        """
+        Note
+        ----
+        Useful for scripts where different operations are to be done if geomA.atoms==geomB.atoms or geomA.atoms!=geomB.atoms
+        
+        Parameters
+        ----------
+        g: geom
+            the geometry to compare with
+            
+        Returns
+        -------
+        bool
+            whether they have the same atoms or not
+        """
+        if len(self.atoms) != len(g.atoms):#Check if geometries have the same atom list
+            return False
+        elif (self.atoms!=g.atoms).all(): #Check if geometries have the same atom list
+            return False
+        else:
+            return True
+        
+    def check_same_atoms(self,g):
+        """
+        Note
+        ----
+        Returns nothing! Just raises specific errors in case
+        
+        Parameters
+        ----------
+        g: geom
+            the geometry to compare with
+        """
+        if len(self.atoms) != len(g.atoms):#Check if geometries have the same atom list
+            raise(NatomsError)
+        elif (self.atoms!=g.atoms).all(): #Check if geometries have the same atom list
+            raise(atomsError)
+            
+    def have_same_unit(self,g):
+        """
+        Note
+        ----
+        Useful for scripts where different operations are to be done if geomA.coord_unit==geomB.coord_unit or geomA.coord_unit!=geomB.coord_unit (e.g. convert)
+        
+        Parameters
+        ----------
+        g: geom
+            the geometry to compare with
+            
+        Returns
+        -------
+        bool
+            whether they have the same unit or not
+        """
+        dict_ = {"angstrom":"angstrom","au":"au","a.u.":"au","bohr":"au"}
+        if dict_[self.coord_unit.lower()] != dict_[g.coord_unit.lower()]:
+            return False
+        else:
+            return True
+        
+    def check_same_unit(self,g):
+        """
+        Note
+        ----
+        Returns nothing! Just raises specific errors in case
+        
+        Parameters
+        ----------
+        g: geom
+            the geometry to compare with
+        """
+        dict_ = {"angstrom":"angstrom","au":"au","a.u.":"au","bohr":"au"}
+        if dict_[self.coord_unit.lower()] != dict_[g.coord_unit.lower()]:
+            raise(unitError)
+            
     def from_xyz(fnm):
         """
         Parameters
@@ -63,13 +343,19 @@ class geom:
         Returns
         -------
         array(3,Natoms)
-            translates the geometry so that the center of mass is in the origin
+            the coordinates translated so that the center of mass is in the origin
         """       
         if not hasattr(self, "com_coords"):
             self.com_coords = self.inp_coords - self.get_com()
         return self.com_coords    
     
-    def add_charges(self, method, charge_list):
+    def center(self):
+        """
+        Translates the geometry so that the center of mass is in the origin
+        """
+        self.coords = self.get_com_coords
+    
+    def add_charges(self, method, charges):
         """
         Note
         ----
@@ -79,34 +365,100 @@ class geom:
         ----------
         method : str
             method used to obtain the atomic point charges
-        charge_list : list[floats]
-            list of the atomic point charges        
+        charges : array or list[floats]
+            array/list of the atomic point charges        
         """
-        if not hasattr(self,"charges"):
-                self.charges = {}
-        self.charges[method] = np.array(charge_list)
+        if type(charges) == list:
+            charges=np.asarray(charges)
+        elif type(charges) == np.ndarray:
+            if len(charges.shape) == 1:
+                pass
+            elif len(charges.shape) == 2:
+                if 1 in charges.shape:
+                    a=charges.shape.index(1)
+                    charges.reshape(charges.shape[0 if a==1 else 1])
+                else:
+                    raise otherError("2D array!! only give the charges as a list, (n,) or (n,1) or (1,n) array!")
+            elif len(charges.shape)>2:
+                raise otherError("Your array has 3 or more axis!! only give the charges as a list, (n,) or (n,1) or (1,n) array!")
+        else:
+            raise otherError("Weird type: only give the charges as a list, (n,) or (n,1) or (1,n) array!")
+        if len(charges) != len(self.atoms):
+            raise NatomsError
+        self.charges[method] = charges
         
-    def transl(self, vect, which = "inp"):
+    def copy(self):
+        """
+        Returns
+        -------
+        geom
+            a copy of self
+        """
+#        copy=geom(self.atoms, self.coords)
+#        optionals=[i for i in self.__dict__.keys() if i not in ["atoms","coords"]]
+#        for i in optionals:
+#            setattr(copy,i,getattr(self,i))
+#        return copy
+        import copy as c
+        return c.deepcopy(self)
+    
+    def transl(self, vect):
         """
         Parameters
         ----------
         vect : array(3)
             translation vector to apply
-        which : {"inp", "com"}
-            coordinates to translate, default is inp
+        """
+        self.coords = np.add(self.coords, vect)
+        
+    def rot_matrix(self,M):
+        """
+        Rotate with matrix M
+    
+        Parameters
+        ----------
+        M : np.array(3,3)
+            rotation matrix
+            
+        """
+        self.coords = np.dot(self.coords, M) 
+        
+    def rot_ax(self, ax, x, angle_unit = "deg"): #todo: check if np.asmatrix can be avoided, implement for vector
+        """
+        Parameters
+        ----------
+        ax : array(3)
+            axis(vector) to rotate around
+        x : float
+            angle to rotate of, in deg or rad
+        angle_unit : {"deg", "rad"}
+            unit for the angle, default is degree
             
         Returns
-        -------
         geom
-            geometry object where inp_coords are the results of the translation
+            rotated geometry
+        -------
         """
-        return geom(self.atoms, np.add(self.coords(which), vect))
+        if np.linalg.norm(ax)!=1:
+            from transformations import uvec
+            ax=uvec(ax)
+        if angle_unit=="deg":
+            x=np.divide(np.multiply(x,np.pi),180)
+        elif angle_unit=="rad":
+            pass
+        else:
+            print("This unit for angles is not implemented yet. Why don't you do it, champ?")
+        out=np.add(np.multiply(self.coords,np.cos(x)),
+        np.add((np.multiply(np.asmatrix(ax).T,np.multiply(np.asmatrix(np.dot(self.coords,ax)),np.subtract(1,np.cos(x))))).T,
+        np.multiply(np.cross(ax,self.coords),np.sin(x))))
+        self.coords=np.asarray(out)
     
     def mix(self, g, ratio=0.5):
         """
         Note
         ----
-        useful tool for "oscillating" geometry optimisations. NB uses input coordinates
+        useful tool for "oscillating" geometry optimisations. 
+        NB. it wipes charges!
         
         Parameters
         ----------
@@ -114,48 +466,55 @@ class geom:
             geometry to mix with
         ratio : float
             ratio of self
-            
-        Returns
-        -------
-        geom
-            geometry obtained from mixing self with g with the desired ratio 
         """
-        from geomtools.fragments import mix_geoms
-        return mix_geoms(self,g,ratio)
+        self.check_same_atoms(g)
+        self.check_same_unit(g)
+        self.coords=np.add(np.multiply(ratio,self.coords),np.multiply(1-ratio,g.coords))
+        self.charges = {}
     
-    def coords(self, which):
+    def inherit_optionals(self,g):
         """
+        Note
+        ----
+        copies all attributes but atoms and coords from g. Useful for FF charges or custom attributes
+        
         Parameters
         ----------
-        which : {"inp", "com"}
-            "inp" for the input coordinates, "com" for coordinates translated to have the com at the origin
+        g: geom
+            geometry to inherit from
+        """
+        optionals=[i for i in self.__dict__.keys() if i not in ["atoms","coords"]]
+        for i in optionals:
+            setattr(self,i,getattr(g,i))
         
-        Returns
-        -------
-        coords : array(3,Natoms)
-            Either inp_coords or com_coords
+    def add_atoms(self, g, keep_charges=False):
         """
-        if which=="com":
-            return self.get_com_coords()
-        if which=="inp":
-            return self.inp_coords
-        else:
-            print("ERROR. Use either \"inp\" for input coordinates or \"com\" for coordinates centered at the center of mass")
-            
-    def add(self, g):
-        """
+        Note
+        ----
+        Any custom attribute of the geometry you add is lost. 
+        If keep_charges==True it will combine the charges of the two geometries for any method both have available
+        
         Parameters
         ----------
         g : geom
             geometry to add
-        
-        Returns
-        -------
-        geom
-            geometry object containing self+g
+        keep_charges : bool
+            whether to keep charges from the 2 geometries and combine them
         """
-        from geomtools.fragments import comb_geoms
-        return comb_geoms(self, g)
+        self.check_same_unit(g)
+        self.atoms = np.append(self.atoms,g.atoms)
+        self.coords = np.append(self.coords,g.coords,axis=0)
+        todel=[]
+        if keep_charges:
+            for m in self.charges.keys():
+                if m in g.charges.keys():
+                    self.charges[m]=np.append(self.charges[m],g.charges[m])
+                else:
+                    todel.append(m)
+            for m in todel:
+                del self.charges[m]
+        else:
+            self.charges={}
     
     def get_charge_dipole(self, method, charge=0, dip_unit="au"):
         """
@@ -176,7 +535,7 @@ class geom:
         if not hasattr(self,"charge_dipoles"):
                     self.charge_dipoles = {}
                     self.charge_dipoles_units={}
-        self.charge_dipoles[method]=calculate_charge_dipole(self,method,coords=self.coord_unit,out=dip_unit,charge=0)
+        self.charge_dipoles[method]=calculate_charge_dipole(self,method,coords=self.coord_unit,out=dip_unit,charge=charge)
         self.charge_dipoles_units[method]=dip_unit
         return self.charge_dipoles[method]
     
@@ -184,7 +543,7 @@ class geom:
         """
         Note
         ----
-        Changes the unit of inp_coords
+        Changes the unit of coords
         
         Parameters
         ----------
@@ -196,11 +555,11 @@ class geom:
             print("The coordinates are already in "+out)
         elif dict_[self.coord_unit.lower()]=="angstrom" and dict_[out.lower()]=="au":
             print("changing coordinates from "+self.coord_unit+" to "+out)
-            self.inp_coords=np.multiply(1.88973,self.inp_coords)
+            self.coords=np.multiply(1.88973,self.coords)
             self.coord_unit="au"
         elif dict_[self.coord_unit.lower()]=="au" and dict_[out.lower()]=="angstrom":
             print("changing coordinates from "+self.coord_unit+" to "+out)
-            self.inp_coords=np.multiply(0.529177,self.inp_coords)
+            self.coords=np.multiply(0.529177,self.coords)
             self.coord_unit="angstrom"
         else:
             print("Unit combination not implemented yet. Why don't you do it?")
@@ -217,15 +576,39 @@ class geom:
         geom
             geometry in the new order
         """
-        return geom(self.atoms[o],self.inp_coords[o])
+        return geom(self.atoms[o],self.coords[o])
     
-    def to_xyz(self, fnm, which="inp", decimals=6, spaces=4):
+    def to_xyz(self, fnm, decimals=6, spaces=4):
         """
         Does not work yet. Do not know why
         """
         from geomtools.io import write_xyz
-        write_xyz(self, fnm, which, decs=decimals, spacing=spaces)
-           
+        write_xyz(self, fnm, decs=decimals, spacing=spaces)
+        
+def have_same_atoms(g1,g2):
+    if len(g1.atoms) != len(g2.atoms):#Check if geometries have the same atom list
+        return False
+    elif (g1.atoms!=g2.atoms).all(): #Check if geometries have the same atom list
+        return False
+    else:
+        return True
+    
+def check_same_atoms(g1,g2):
+    if len(g1.atoms) != len(g2.atoms):#Check if geometries have the same atom list
+        raise(NatomsError)
+    elif (g1.atoms!=g2.atoms).all(): #Check if geometries have the same atom list
+        raise(atomsError)
+        
+def have_same_unit(g1,g2):
+    if g1.coord_unit != g2.coord_unit:#Check if geometries have the same atom list
+        return False
+    else:
+        return True
+    
+def check_same_unit(g1,g2):
+    if g1.coord_unit != g2.coord_unit:#Check if geometries have the same atom list
+        raise(unitError)
+        
 def calculate_charge_dipole(g, method, charge=0, coords="Angstrom", out="au"):
     """
     Note
@@ -251,14 +634,14 @@ def calculate_charge_dipole(g, method, charge=0, coords="Angstrom", out="au"):
         dipole obtained from the atomic point charges
     """
     if charge!=0:
-        coc=np.divide(np.sum(g.inp_coords,axis=0),np.multiply(charge,len(g.atoms)))
+        coc=np.divide(np.sum(g.coords,axis=0),np.multiply(charge,len(g.atoms)))
     else:
         coc=np.zeros(3)
-    d=np.sum(np.multiply(g.charges[method].reshape(len(g.atoms),1),g.inp_coords-coc),axis=0)
+    d=np.sum(np.multiply(g.charges[method].reshape(len(g.atoms),1),g.coords-coc),axis=0)
     dict_={"au":"au", "a.u.":"au", "bohr":"au", "angstrom":"angstrom", "debye":"debye"}
     if coords.lower() not in dict_.keys() or out not in dict_.keys():
         print("combination of units of measure not implemented yet. Why don't you do it, champ?")
-        sys.exit(0)
+        raise(NotImplementedError)
     if dict_[coords.lower()]=="angstrom":
         d=np.divide(d,0.529177)
     if dict_[out.lower()]=="debye":

@@ -26,7 +26,7 @@ def read_xyz(fnm):
         for i in range(2,Natoms+2):
             atoms.append(rl[i].split()[0])
             coords.append(np.asarray([np.float64(i) for i in rl[i].split()[1:]]))
-        Geom=geom(np.array(atoms), np.array(coords))
+        Geom=geom(np.array(atoms), np.array(coords), coord_unit="Angstrom", charges_dict={})
     return Geom
 
 def read_zr(fnm):
@@ -55,8 +55,8 @@ def read_zr(fnm):
             else:
                 atoms[AorB].append(rl[i].split()[0])
                 coords[AorB].append(np.asarray([np.float64(i) for i in rl[i].split()[1:]]))
-        GeomA=geom(np.array(atoms[0]), np.array(coords[0]))
-        GeomB=geom(np.array(atoms[1]), np.array(coords[1]))
+        GeomA=geom(np.array(atoms[0]), np.array(coords[0]), coord_unit="Angstrom", charges_dict={})
+        GeomB=geom(np.array(atoms[1]), np.array(coords[1]), coord_unit="Angstrom", charges_dict={})
     return GeomA,GeomB
 
 def read_coords(fnm, inp="Angstrom", out="Angstrom"):
@@ -92,7 +92,7 @@ def read_coords(fnm, inp="Angstrom", out="Angstrom"):
             coords=np.divide(coords,0.529177)
         else:
             print("combination of units of measure not implemented yet. Why don't you do it, champ?")
-        Geom=geom(np.array(atoms), np.array(coords))
+        Geom=geom(np.array(atoms), np.array(coords), coord_unit=out, charges_dict={})
     return Geom
 
 def read_charge_txt(fnm):
@@ -123,7 +123,7 @@ def read_charge_txt(fnm):
                 break
     return charge_list
 
-def write_xyz(g, fnm, which="inp", decs=6, spacing=4):
+def write_xyz(g, fnm, decs=6, spacing=4):
     """
     Note
     ----
@@ -135,8 +135,6 @@ def write_xyz(g, fnm, which="inp", decs=6, spacing=4):
         geometry to write
     fnm : str
         name or path of the output file
-    which : {"inp", "com"}
-        coordinates to write
     decs : int
         number of desired decimal digits
     spacing : int
@@ -145,13 +143,13 @@ def write_xyz(g, fnm, which="inp", decs=6, spacing=4):
     with open(fnm,"w") as out:
         out.write(" "+str(len(g.atoms))+"\n\n")
         for i in range(len(g.atoms)):
-            out.write(g.atoms[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}\n'.format(g.coords(which)[i][0],g.coords(which)[i][1],g.coords(which)[i][2],w=spacing+decs+1, p=decs))
+            out.write(g.atoms[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}\n'.format(g.coords[i][0],g.coords[i][1],g.coords[i][2],w=spacing+decs+1, p=decs))
             
 def write_zr(gA, gB, fnm, decs=6, spacing=4):
     """
     Note
     ----
-    writes 2 geomtries as a .zr file. inp_coords of both gA and gB are taken!
+    writes 2 geomtries as a .zr file.
     
     Parameters
     ----------
@@ -168,13 +166,13 @@ def write_zr(gA, gB, fnm, decs=6, spacing=4):
     """
     with open(fnm,"w") as out:
             for i in range(len(gA.atoms)):
-                out.write(gA.atoms[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}\n'.format(gA.inp_coords[i][0],gA.inp_coords[i][1],gA.inp_coords[i][2],w=spacing+decs+1, p=decs))
+                out.write(gA.atoms[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}\n'.format(gA.coords[i][0],gA.coords[i][1],gA.coords[i][2],w=spacing+decs+1, p=decs))
             out.write("----\n")
             for i in range(len(gB.atoms)):
-                out.write(gB.atoms[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}\n'.format(gB.inp_coords[i][0],gB.inp_coords[i][1],gB.inp_coords[i][2],w=spacing+decs+1, p=decs))
+                out.write(gB.atoms[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}\n'.format(gB.coords[i][0],gB.coords[i][1],gB.coords[i][2],w=spacing+decs+1, p=decs))
             
 
-def write_coords(g, fnm, which="inp", inp="Angstrom", out="Angstrom", decs=6, spacing=4):
+def write_coords(g, fnm, inp="Angstrom", out="Angstrom", decs=6, spacing=4):
     """
     Note
     ----
@@ -186,8 +184,6 @@ def write_coords(g, fnm, which="inp", inp="Angstrom", out="Angstrom", decs=6, sp
         geometry to write
     fnm : str
         name or path of the output file
-    which : {"inp", "com"}
-        coordinates to write
     inp : {"Angstrom","au","a.u.","bohr"}
         unit of the input, default is Angstrom. NB case insensitive
     out : {"Angstrom","au","a.u.","bohr"}
@@ -206,10 +202,9 @@ def write_coords(g, fnm, which="inp", inp="Angstrom", out="Angstrom", decs=6, sp
         factor=1.88973
     else:
         print("combination of units of measure not implemented yet. Why don't you do it, champ?")
-    coords_to_print=np.multiply(factor,g.coords(which))
+    coords_to_print=np.multiply(factor,g.coords)
     with open(fnm,"w") as out:
         for i in range(len(g.atoms)):
-#            out.write(g.atoms[i]+"    "+"    ".join(map(str,np.multiply(factor,g.coords(which)[i])))+"\n")   
              out.write(g.atoms[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}\n'.format(coords_to_print[i][0],coords_to_print[i][1],coords_to_print[i][2],w=spacing+decs+1, p=decs))
            
            
@@ -243,8 +238,8 @@ def write_frag_file(fnm, *args, Type="calculate", decs=6, spacing=4):
         print("Go home bro, you're drunk")
     sl=[]
     for i in frag_list:
-        sl.append("\n".join([i.atoms[j]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}'.format(i.inp_coords[j][0],i.inp_coords[j][1],i.inp_coords[j][2],w=spacing+decs+1, p=decs) for j in range(len(i.atoms))]))
-#        sl.append("\n".join([i.atoms[j]+"    "+"    ".join(map(str,i.inp_coords[j])) for j in range(len(i.atoms))]))
+        sl.append("\n".join([i.atoms[j]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}'.format(i.coords[j][0],i.coords[j][1],i.coords[j][2],w=spacing+decs+1, p=decs) for j in range(len(i.atoms))]))
+#        sl.append("\n".join([i.atoms[j]+"    "+"    ".join(map(str,i.coords[j])) for j in range(len(i.atoms))]))
     with open(fnm,"w") as out:
         out.write(("\n--\n").join(sl))
         

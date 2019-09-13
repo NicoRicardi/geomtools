@@ -4,10 +4,10 @@
 Contains anything related to analysis of distances, ordering, and combining/dividing fragments
 """
 import numpy as np
-import sys
+#import sys
 from geomtools.geom import geom
 
-def mix_geoms(g1, g2, which1="inp", which2="inp", ratio=0.5,):
+def mix_geoms(g1, g2, ratio=0.5,):
     """
     Note
     ----
@@ -16,12 +16,8 @@ def mix_geoms(g1, g2, which1="inp", which2="inp", ratio=0.5,):
     ----------
     g1 : geom
         geometry 1
-    which1 : {"inp", "com"}
-        coordinates to use for g1
     g2 : geom
         geometry 2
-    which2 : {"inp", "com"}
-        coordinates to use for g2        
     ratio : float
         weight of g1, default is 0.5. 
         
@@ -30,11 +26,12 @@ def mix_geoms(g1, g2, which1="inp", which2="inp", ratio=0.5,):
     geom
         mixed geometry
     """
-    if (g1.atoms!=g2.atoms).all():
-        print("The two geometries do not have the same atoms!!")    #Check if geometries have the same atom list
-    return geom(g1.atoms,np.add(np.multiply(ratio,g1.coords(which1)),np.multiply(1-ratio,g2.coords(which2))))
+    from geomtools.geom import check_same_atoms,check_same_unit
+    check_same_atoms(g1,g2)
+    check_same_unit(g1,g2)
+    return geom(g1.atoms,np.add(np.multiply(ratio,g1.coords),np.multiply(1-ratio,g2.coords)))
                 
-def dist_order(g, which="com"):
+def dist_order(g):
     """
     Note
     ----
@@ -44,15 +41,13 @@ def dist_order(g, which="com"):
     ----------
     g : geom
         geometry to reorder
-    which : {"com", "inp"}
-        coordinates to order, default is com
     
     Returns
     -------
     tuple
         (array of distances in the order of g.atoms, order of atom indexes from the closest to the furthest)
     """
-    d=np.sqrt(np.add(np.add((g.coords(which)[:,0])**2,(g.coords(which)[:,1])**2),(g.coords(which)[:,2])**2))
+    d=np.sqrt(np.add(np.add((g.coords[:,0])**2,(g.coords[:,1])**2),(g.coords[:,2])**2))
     order=d.argsort()
     return (d, order)
 
@@ -79,15 +74,19 @@ def check_geoms_order(g1, g2, thresh=0.00005):
         False if the geometry are ordered differently
         True if they are ordered in the same way
     """
+    g1.check_same_atoms(g2)
+    g1.check_same_units(g2)
     d1, o1 = dist_order(g1)
     d2, o2 = dist_order(g2)
     if (g1.atoms[o1]!=g2.atoms[o1]).any() or (d1[o1] - d2[o1] > thresh).any():
         return False
     else:
         ncm=np.add(np.multiply(g1.get_com_coords()[o1][0],np.multiply(3,thresh)),np.multiply(np.multiply(1.5,thresh),np.random.rand(3)))
-        g1a, g2a = g1.transl(ncm, which="com"), g2.transl(ncm, which="com") 
-        da1, oa1 = dist_order(g1a,which="inp")
-        da2, oa2 = dist_order(g2a, which="inp")
+        from transformations import center
+        g1a,g2a = center(g1), center(g2)
+        g1a.transl(ncm), g2a.transl(ncm) 
+        da1, oa1 = dist_order(g1a)
+        da2, oa2 = dist_order(g2a)
         return (da1[oa1] - da2[oa1] < thresh).all()
     
 def geoms_reorder_equally(g1, g2, thresh=0.00005):
@@ -111,43 +110,19 @@ def geoms_reorder_equally(g1, g2, thresh=0.00005):
     tuple
         (geometry 1 reordered, geometry 2 reordered)
     """
+    from geomtools.geom import check_same_atoms,check_same_unit
+    check_same_atoms(g1,g2)
+    check_same_unit(g1,g2)
     d1, o1 = dist_order(g1)
     d2, o2 = dist_order(g2)
-    if (g1.atoms[o1]!=g2.atoms[o1]).any() or (d1[o1] - d2[o1] > thresh).any():
-        print("These are not the same geometry!!!")
-        sys.exit(0)
+    if (d1[o1] - d2[o1] > thresh).any():
+        raise geom.otherError("These are not the same geometry!!!")
     else:
         ncm=np.add(np.multiply(g1.get_com_coords()[o1][0],np.multiply(3,thresh)),np.multiply(np.multiply(1.5,thresh),np.random.rand(3)))
         g1a, g2a = geom(g1.atoms,g1.get_com_coords() - ncm), geom(g2.atoms,g2.get_com_coords() - ncm) #todo: use transl
-        da1, oa1 = dist_order(g1a,which="inp")
-        da2, oa2 = dist_order(g2a, which="inp")   
-        return (geom(g1.atoms[oa1],g1.coords("inp")[oa1]),geom(g2.atoms[oa2],g2.coords("inp")[oa2]))
-
-def get_cov_radius(El):
-    """
-    Parameters
-    ----------
-    El : str
-        element whose radius is desired
-        
-    Returns
-    -------
-    float
-        the first radius available from [Bragg, Slater, Cordero, Pyykko]
-        
-    """
-    import mendeleev as md
-    if md.element(El).covalent_radius_bragg!=None:
-        return np.multiply(0.01,md.element(El).covalent_radius_bragg)
-    elif md.element(El).covalent_radius_slater!=None:
-        return np.multiply(0.01,md.element(El).covalent_radius_slater)
-    elif md.element(El).covalent_radius_cordero!=None:
-        return np.multiply(0.01,md.element(El).covalent_radius_cordero)
-    elif md.element(El).covalent_radius_pyykko!=None:
-        return np.multiply(0.01,md.element(El).covalent_radius_pyykko)
-    else:
-        print("Cannot find radius!")
-        return None
+        da1, oa1 = dist_order(g1a)
+        da2, oa2 = dist_order(g2a)   
+        return (geom(g1.atoms[oa1],g1.coords[oa1]),geom(g2.atoms[oa2],g2.coords[oa2]))
 
 def get_ordd_dist_mat(g):
     """
@@ -164,7 +139,7 @@ def get_ordd_dist_mat(g):
     """
     from scipy.spatial import distance_matrix
     d, o = dist_order(g)
-    DM1=distance_matrix(g.inp_coords,g.inp_coords)
+    DM1=distance_matrix(g.coords,g.coords)
     row_ord=DM1[o[-1]].argsort()
     P = np.identity(len(row_ord))[:,row_ord]
     return np.dot(np.dot(P.T,DM1),P), row_ord
@@ -192,30 +167,31 @@ def get_bond_matrix(g): #todo: sum of vdw radii
     for i in range(len(row_ord)):
         R_i = np.multiply(0.01,md.element(g.atoms[row_ord][i]).vdw_radius)
         BM[i]=(DM[i] < R_i)
+    BM=np.maximum(BM,BM.T)
     return (BM, row_ord)
 
 def comb_geoms(*args,List=False):
     """
     Parameters
     ----------
-    List : bool
-        whether the geometries will be given individually(False) or as a list(True), default is False
-        False=> args=geom1,geom2...
-        True=> args=[geom1,geom2...]
+    the geometry to combine can be given as:
+        separately=> args=geom1,geom2...
+        list=> args=[geom1,geom2...]
     
     Return
     ------
     geom
         combined geometry
     """
-    if List:
-       g_comb  = args[0][0]
-       for i in args[0][1:]:
-            g_comb = geom(np.append(g_comb.atoms,i.atoms),np.append(g_comb.inp_coords,i.inp_coords,axis=0))
+    if len(args)==1:
+        geoms=args[0]
     else:
-        g_comb  = args[0]
-        for i in args[1:]:
-            g_comb = geom(np.append(g_comb.atoms,i.atoms),np.append(g_comb.inp_coords,i.inp_coords,axis=0))
+        geoms=args
+
+    g_comb  = geoms[0]
+    for i in geoms[1:]:
+        g_comb.check_same_unit(i)
+        g_comb = geom(np.append(g_comb.atoms,i.atoms),np.append(g_comb.coords,i.coords,axis=0))
     return g_comb
 
 def get_fragments(g):  
@@ -248,5 +224,5 @@ def get_fragments(g):
         j+=1
     frags=[]
     for i in f:
-        frags.append(geom(g.atoms[o][i],g.inp_coords[o][i]))
+        frags.append(geom(g.atoms[o][i],g.coords[o][i]))
     return frags
