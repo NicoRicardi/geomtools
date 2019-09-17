@@ -266,9 +266,9 @@ class geom:
             the geometry to compare with
         """
         if len(self.atoms) != len(g.atoms):#Check if geometries have the same atom list
-            raise(NatomsError)
+            raise NatomsError()
         elif (self.atoms!=g.atoms).all(): #Check if geometries have the same atom list
-            raise(atomsError)
+            raise atomsError()
             
     def have_same_unit(self,g):
         """
@@ -305,7 +305,7 @@ class geom:
         """
         dict_ = {"angstrom":"angstrom","au":"au","a.u.":"au","bohr":"au"}
         if dict_[self.coord_unit.lower()] != dict_[g.coord_unit.lower()]:
-            raise(unitError)
+            raise unitError()
             
     def from_xyz(fnm):
         """
@@ -384,7 +384,7 @@ class geom:
         else:
             raise otherError("Weird type: only give the charges as a list, (n,) or (n,1) or (1,n) array!")
         if len(charges) != len(self.atoms):
-            raise NatomsError
+            raise NatomsError()
         self.charges[method] = charges
         
     def copy(self):
@@ -595,9 +595,9 @@ def have_same_atoms(g1,g2):
     
 def check_same_atoms(g1,g2):
     if len(g1.atoms) != len(g2.atoms):#Check if geometries have the same atom list
-        raise(NatomsError)
+        raise NatomsError()
     elif (g1.atoms!=g2.atoms).all(): #Check if geometries have the same atom list
-        raise(atomsError)
+        raise atomsError()
         
 def have_same_unit(g1,g2):
     if g1.coord_unit != g2.coord_unit:#Check if geometries have the same atom list
@@ -607,7 +607,7 @@ def have_same_unit(g1,g2):
     
 def check_same_unit(g1,g2):
     if g1.coord_unit != g2.coord_unit:#Check if geometries have the same atom list
-        raise(unitError)
+        raise unitError() 
         
 def calculate_charge_dipole(g, method, charge=0, coords="Angstrom", out="au"):
     """
@@ -641,7 +641,7 @@ def calculate_charge_dipole(g, method, charge=0, coords="Angstrom", out="au"):
     dict_={"au":"au", "a.u.":"au", "bohr":"au", "angstrom":"angstrom", "debye":"debye"}
     if coords.lower() not in dict_.keys() or out not in dict_.keys():
         print("combination of units of measure not implemented yet. Why don't you do it, champ?")
-        raise(NotImplementedError)
+        raise NotImplementedError
     if dict_[coords.lower()]=="angstrom":
         d=np.divide(d,0.529177)
     if dict_[out.lower()]=="debye":
