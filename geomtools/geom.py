@@ -128,7 +128,7 @@ class geom:
         geom
             the total geometry
         """
-        from fragments import comb_geoms
+        from geomtools.fragments import comb_geoms
         return comb_geoms(self,other)
     
     def __iadd__(self, other):
@@ -440,7 +440,7 @@ class geom:
         -------
         """
         if np.linalg.norm(ax)!=1:
-            from transformations import uvec
+            from geomtools.transformations import uvec
             ax=uvec(ax)
         if angle_unit=="deg":
             x=np.divide(np.multiply(x,np.pi),180)

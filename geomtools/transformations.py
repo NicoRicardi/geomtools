@@ -147,7 +147,9 @@ def rot_ax(g, ax, x, angle_unit = "deg"): #todo: check if np.asmatrix can be avo
     geom
         rotated geometry
     """
-    return g.rot_ax(ax, x, angle_unit = "deg")
+    c=g.copy()
+    c.rot_ax(ax, x, angle_unit = angle_unit)
+    return c
 
 def rot_matrix(g,M):
     """
@@ -165,7 +167,9 @@ def rot_matrix(g,M):
     geom
         rotated geometry
     """
-    return g.rot_matrix(M)
+    c=g.copy()
+    c.rot_matrix(M)
+    return c
 
 def align_vec(v1,v2,unit="deg"):
     """
@@ -269,9 +273,11 @@ def rmsd(V, W):
     float
         Root-mean-square deviation between the two vectors
     """
-    for i in [V,W]:
-        if type(i)==geom:
+    for i in [V,W]: #TODO change!!!
+        try:
             i=i.coords
+        except:
+            pass
     D = len(V[0])
     N = len(V)
     result = 0.0
@@ -299,9 +305,11 @@ def kabsch_rmsd(g1, g2):
     float
         root-mean squared deviation
     """
-    for i in [g1,g2]:
-        if type(i)==geom:
+    for i in [g1,g2]: # TODO change!!
+        try:
             i=i.coords
+        except:
+            pass
     g1 = kabsch_rotate(g1, g2)
     return rmsd(g1, g2)
 
@@ -329,16 +337,16 @@ def kabsch_rotate(g1, g2):
     """
     c=[]
     for i in [g1,g2]:
-        if type(i)==geom:
+        try:
             c.append(i.coords)
-        else:
+        except:
             c.append(i)
     U = kabsch_find_rot(c[0], c[1])
 
     # Rotate P
-    if type(g1)==geom:
+    try:
         out=rot_matrix(g1,U)
-    else:
+    except:
         out = np.dot(c[0], U)
     return out
 
@@ -371,9 +379,14 @@ def kabsch_find_rot(g1, g2):
     array(3,3)
         Rotation matrix (3,3)
     """
-    for i in [g1,g2]:
-        if type(i)==geom:
-            i=i.coords
+    try:
+        g1=g1.coords
+    except:
+        pass
+    try:
+        g2=g2.coords
+    except:
+        pass
     # Computation of the covariance matrix
     C = np.dot(np.transpose(g1), g2)
 
@@ -440,7 +453,7 @@ def apply_point_symm(g,point):
                 point.reshape(point.shape[0 if a==1 else 1])
             else:
                print("2D array!! only give the charges as a list, (n,) or (n,1) or (1,n) array!")
-               sys.exit() 
+               sys.exit() #TODO change with exceptions
         else:
             raise geom.otherError("Array with more than 2 axes!! Give point as listor as array of shape: (3,),(3,1),(1,3)")
     s=geom(g.atoms,np.zeros([len(g.atoms),3]))
