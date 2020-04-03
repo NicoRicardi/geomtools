@@ -46,8 +46,20 @@ class unitError(Error):
         self.message = "Mismatch in unit!!"
         print(self.message)
         
-class otherError(Error):
+class sizemismatchError(Error):
     """Mismatch in the units.
+
+    Attributes:
+        expression -- input expression in which the error occurred
+        message -- explanation of the error
+    """
+
+    def __init__(self,message):
+        self.message = message
+        print(self.message)      
+        
+class otherError(Error):
+    """Other error.
 
     Attributes:
         expression -- input expression in which the error occurred
@@ -64,7 +76,7 @@ class geom:
     ----
     Geometry object that contains atom labels and one or more set of coordinates for the molecule(s)
     """
-    def __init__(self, atoms, coords, coord_unit="Angstrom", charges_dict={}):
+    def __init__(self, atoms, coords, identifier= "", coord_unit="Angstrom", charges_dict={}):
         """
         Parameters
         ----------
@@ -72,17 +84,37 @@ class geom:
             Element symbols for the atoms
         coords : array(Natoms,3)
             x,y,z coordinates for each atom
+        identifier: str or array(Natoms)
+            identifier for this molecule to add after every atom. Useful for pyscf, but use wisely!
         coord_unit : str
             unit for coordinates, defaults is Angstrom 
         charges_dict: dict
             keys=method(s) values=array of charges
         """
         self.atoms = atoms
+        if identifier:
+            print("Beware of risky identifiers ('a','b','c','d') and third party modules! 'C'+'a/A' could be read as calcium!")
+        if type(identifier) not in [str, np.ndarray]:  # if non-standard type
+            if type(identifier) in [tuple, list]:  # equivalent to array
+                identifier = np.asarray(identifier)
+            else:  # int or other stuff
+                try:
+                    identifier = str(identifier)  # try turn to string 
+                except:
+                    raise TypeError("identifier is an array(Natoms), lists/tuples can be converted, int/float/str are converted to array of strings")
+        ##Now identifier is either np.ndarray or str
+        if type(identifier) == np.ndarray and type(identifier[0]) != np.str_:  # array of int/float => array of str
+            identifier = np.array([str(i) for i in identifier])
+        if type(identifier) == str:  # str => array of str
+            identifier = np.array([identifier for i in range(len(self.atoms))])
+        self.identifier = identifier
         self.coords = coords
+        if not (np.array([len(self.atoms),len(self.identifier)])== len(self.coords)).all():
+            raise sizemismatchError("atoms, identifier, and coords must have the same lenght!")
         self.coord_unit = coord_unit.lower()
         self.charges = charges_dict
     
-    def __str__(self, spacing=4, decs=6):
+    def __str__(self, identifier = True, spacing=4, decs=6):
         """
         Note
         ----
@@ -95,7 +127,10 @@ class geom:
         decs: int
             number of decimal digits desired
         """
-        return "\n".join([self.atoms[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}'.format(self.coords[i][0],self.coords[i][1],self.coords[i][2],w=spacing+decs+1, p=decs) for i in range(len(self.atoms))])
+        if identifier:
+            return "\n".join([self.atoms[i]+self.identifier[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}'.format(self.coords[i][0],self.coords[i][1],self.coords[i][2],w=spacing+decs+1, p=decs) for i in range(len(self.atoms))])
+        else:
+            return "\n".join([self.atoms[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}'.format(self.coords[i][0],self.coords[i][1],self.coords[i][2],w=spacing+decs+1, p=decs) for i in range(len(self.atoms))])
         
     def __repr__(self, spacing=4, decs=6):
         """
@@ -112,7 +147,7 @@ class geom:
         """
         return "\n".join([self.atoms[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}'.format(self.coords[i][0],self.coords[i][1],self.coords[i][2],w=spacing+decs+1, p=decs) for i in range(len(self.atoms))])
     
-    def __add__(self, other):
+    def __add__(self, g):
         """
         Note
         ----
@@ -120,7 +155,7 @@ class geom:
         
         Parameters
         ----------
-        other: geom
+        g: geom
             geometry to add
         
         Returns
@@ -128,10 +163,10 @@ class geom:
         geom
             the total geometry
         """
-        from geomtools.fragments import comb_geoms
-        return comb_geoms(self,other)
+        from geomtools.fragments import comb_geoms #TODO check identifier
+        return comb_geoms(self,g)
     
-    def __iadd__(self, other):
+    def __iadd__(self, g):
         """
         Note
         ----
@@ -139,10 +174,10 @@ class geom:
         
         Parameters
         ----------
-        other: geom
+        g: geom
             geometry to add
         """
-        self.add_atoms(other)
+        self.add_atoms(g) 
         return self
         
     def __sub__(self,vect):
@@ -183,7 +218,7 @@ class geom:
         self.transl(-vect)
         return self
         
-    def __eq__(self,other, thresh=1e-6):
+    def __eq__(self,g, thresh=1e-6):
         """
         Note
         ----
@@ -191,7 +226,7 @@ class geom:
         
         Parameters
         ----------
-        other: geom
+        g: geom
             geometry to compare to
         
         Returns
@@ -199,15 +234,18 @@ class geom:
         bool
             whether they are equal or not
         """
-        self.check_same_unit(other)
-        if len(self.atoms) != len(other.atoms):#Check if geometries have the same atom list
+        if type(self) != type(g):
             return False
-        elif (self.atoms!=other.atoms).all(): #Check if geometries have the same atom list
+        elif not self.have_same_unit(g):
+            return False
+        elif len(self.atoms) != len(g.atoms):#Check if geometries have the same atom list
+            return False
+        elif (self.atoms != g.atoms).all(): #Check if geometries have the same atom list
             return False
         else:
-            return (abs(self.coords-other.coords) < thresh).all()
+            return (abs(self.coords - g.coords) < thresh).all()
         
-    def __neq__(self,other, thresh=1e-6):
+    def __neq__(self,g, thresh=1e-6):
         """
         Note
         ----
@@ -215,7 +253,7 @@ class geom:
         
         Parameters
         ----------
-        other: geom
+        g: geom
             geometry to compare to
         
         Returns
@@ -223,14 +261,95 @@ class geom:
         bool
             whether they are different or not
         """
-        self.check_same_unit(other)
-        if len(self.atoms) != len(other.atoms):#Check if geometries have the same atom list
+        if type(self) != type(g):
             return True
-        elif (self.atoms!=other.atoms).all(): #Check if geometries have the same atom list
+        elif not self.have_same_unit(g):
+            return True
+        elif len(self.atoms) != len(g.atoms):#Check if geometries have the same atom list
+            return True
+        elif (self.atoms != g.atoms).all(): #Check if geometries have the same atom list
             return True
         else:
-            return (abs(self.coords-other.coords) > thresh).any()
-    
+            return (abs(self.coords - g.coords) > thresh).any()
+        
+    def strip_identifier(self):
+        """
+        Note
+        ----
+        sets the identifier to array of empty strings
+        """
+        self.identifier = np.array(["" for i in range(len(self.atoms))])
+            
+    def add_identifier(self, identifier):
+        """
+        Note
+        ----
+        Sets the identifier.
+        
+        Parameters
+        ----------
+        identifier: str 
+            desired identifier. if not string tries to convert
+        """
+        if (self.identifier!="").any():
+            raise otherError("Geometry already has an identifier! use change_identifier!")
+        print("Beware of risky identifiers ('a','b','c','d') and third party modules! 'C'+'a/A' could be read as calcium!")
+        if type(identifier) not in [str, np.ndarray]:  # if non-standard type
+            if type(identifier) in [tuple, list]:  # equivalent to array
+                identifier = np.asarray(identifier)
+            else:  # int or other stuff
+                try:
+                    identifier = str(identifier)  # try turn to string 
+                except:
+                    raise TypeError("identifier is an array(Natoms), lists/tuples can be converted, int/float/str are converted to array of strings")
+        ##Now identifier is either np.ndarray or str
+        if type(identifier) == np.ndarray and type(identifier[0]) != np.str_:  # array of int/float => array of str
+            identifier = np.array([str(i) for i in identifier])
+        if type(identifier) == str:  # str => array of str
+            identifier = np.array([identifier for i in range(len(self.atoms))])
+        if len(identifier) != len(self.atoms):
+            raise sizemismatchError("your identifier does not match natoms!")
+        self.identifier = identifier
+        
+    def change_identifier(self, identifier):
+        """
+        Note
+        ----
+        Changes the identifier.
+        
+        Parameters
+        ----------
+        identifier: str 
+            desired identifier. if not string tries to convert
+        """
+        self.strip_identifier()
+        self.add_identifier(identifier)
+        
+    def number_in_group(self):
+        """
+        Sets
+        ----
+        self.identifier
+            sets it to the numbering for each element
+        """
+        idn = self.atoms.copy()
+        elems, count = np.unique(idn, return_counts=True)
+        for n in range(len(elems)):
+            idn[idn==elems[n]] =  np.arange(1, count[n]+1)
+        self.identifier = idn
+        
+    def ghostify(self):
+        """
+        Note
+        ----
+        Center of mass ignores ghost atoms (they have no mass)
+        Sets
+        ----
+        self.atoms
+            all atoms become their ghost version
+        """
+        self.atoms = np.array(["X"+i for i in self.atoms])
+        
     def have_same_atoms(self,g):
         """
         Note
@@ -249,7 +368,7 @@ class geom:
         """
         if len(self.atoms) != len(g.atoms):#Check if geometries have the same atom list
             return False
-        elif (self.atoms!=g.atoms).all(): #Check if geometries have the same atom list
+        elif (self.atoms != g.atoms).all(): #Check if geometries have the same atom list
             return False
         else:
             return True
@@ -267,7 +386,7 @@ class geom:
         """
         if len(self.atoms) != len(g.atoms):#Check if geometries have the same atom list
             raise NatomsError()
-        elif (self.atoms!=g.atoms).all(): #Check if geometries have the same atom list
+        elif (self.atoms != g.atoms).all(): #Check if geometries have the same atom list
             raise atomsError()
             
     def have_same_unit(self,g):
@@ -307,12 +426,14 @@ class geom:
         if dict_[self.coord_unit.lower()] != dict_[g.coord_unit.lower()]:
             raise unitError()
             
-    def from_xyz(fnm):
+    def from_xyz(fnm, identifier=""):
         """
         Parameters
         ----------
         fnm : str
             name or path to the .xyz file
+        identifier: str or array(Natoms)
+            identifier for the geom object
         
         Returns
         -------
@@ -320,26 +441,74 @@ class geom:
             geometry object from the .xyz file
         """
         from geomtools.io import read_xyz
-        return read_xyz(fnm)
+        return read_xyz(fnm, identifier=identifier)
+    
+    def from_coordfile(fnm, identifier="", inp="Angstrom", out="Angstrom"):
+        """
+        Parameters
+        ----------
+        fnm : str
+            name or path to the .xyz file
+        identifier: str or array(Natoms)
+            identifier for the geom object
+        inp : {"Angstrom","au","a.u.","bohr"}
+            unit of the input, default is Angstrom. NB case insensitive
+        out : {"Angstrom","au","a.u.","bohr"}
+            unit of the output, default is Angstrom. NB case insensitive            
+        
+        Returns
+        -------
+        geom
+            geometry object from the .xyz file
+        """
+        from geomtools.io import read_coords
+        return read_coords(fnm, identifier=identifier, inp=inp, out=out)  
+    
+    def from_string(coord_string, identifier="", inp="Angstrom", out="Angstrom"):
+        """
+        Parameters
+        ----------
+        coord_string : string
+            string with the coordinates
+        identifier: str or array(Natoms)
+            identifier for the geom object
+        inp : {"Angstrom","au","a.u.","bohr"}
+            unit of the input, default is Angstrom. NB case insensitive
+        out : {"Angstrom","au","a.u.","bohr"}
+            unit of the output, default is Angstrom. NB case insensitive
+            
+        Returns
+        -------
+        geom 
+            geometry object from the coord file
+        """
+        from geomtools.io import read_string
+        return read_string(coord_string, identifier=identifier, inp=inp, out=out)    
     
     def get_com(self):
         """
         Note
         ----
-            The center of mass is calculated at most once per geom object
+            The center of mass is calculated at most once per geom object.
+            Ghost atoms have no mass, hence they are ignored
         
         Returns
         -------
         array(3)
             the center of mass of the geometry
         """
-        from geomtools.transformations import find_center
+        from geomtools.transformations import find_center #TODO check identifier
         if not hasattr(self, "com"):
             self.com = find_center(self)
         return self.com
     
     def get_com_coords(self):
         """      
+        Note
+        ----
+            com_coords are calculated at most once per geom object.
+            Ghost atoms have no mass, hence they are ignored
+            
         Returns
         -------
         array(3,Natoms)
@@ -351,6 +520,11 @@ class geom:
     
     def center(self):
         """
+        Note
+        ----
+            com_coords are calculated at most once per geom object.
+            Ghost atoms have no mass, hence they are ignored
+            
         Translates the geometry so that the center of mass is in the origin
         """
         self.coords = self.get_com_coords
@@ -394,11 +568,6 @@ class geom:
         geom
             a copy of self
         """
-#        copy=geom(self.atoms, self.coords)
-#        optionals=[i for i in self.__dict__.keys() if i not in ["atoms","coords"]]
-#        for i in optionals:
-#            setattr(copy,i,getattr(self,i))
-#        return copy
         import copy as c
         return c.deepcopy(self)
     
@@ -487,12 +656,17 @@ class geom:
         for i in optionals:
             setattr(self,i,getattr(g,i))
         
-    def add_atoms(self, g, keep_charges=False):
+    def add_atoms(self, g, keep_charges=False, keep_identifier=False):
         """
         Note
         ----
         Any custom attribute of the geometry you add is lost. 
-        If keep_charges==True it will combine the charges of the two geometries for any method both have available
+        If keep_charges == True it will combine the charges of the two geometries for any method both have available.
+        If keep_charges == False it will also delete the charges of self.
+        If keep_identifier == False all atoms will have the identifier of self.
+        If keep_identifier == True every atom will have its specific identifier,
+        and self.identifier will be as many spaces as the length of the different identifiers.
+        Identifiers of different length will raise an error.
         
         Parameters
         ----------
@@ -500,9 +674,18 @@ class geom:
             geometry to add
         keep_charges : bool
             whether to keep charges from the 2 geometries and combine them
+        keep_identifier: bool
+            whether to keep the identifier of the new geometry for its atoms or not.
         """
         self.check_same_unit(g)
+        if not keep_identifier:
+            if (self.identifier==self.identifier[0]).all():
+                idf = self.identifier[0]
+            else:
+                idf = ""
+            g = change_identifier(g, idf)
         self.atoms = np.append(self.atoms,g.atoms)
+        self.identifier = np.append(self.identifier,g.identifier)
         self.coords = np.append(self.coords,g.coords,axis=0)
         todel=[]
         if keep_charges:
@@ -584,8 +767,94 @@ class geom:
         """
         from geomtools.io import write_xyz
         write_xyz(self, fnm, decs=decimals, spacing=spaces)
-        
+
+def ghostify(g):
+    """
+    Note
+    ----
+    Center of mass ignores ghost atoms (they have no mass)
+    
+    Parameters
+    ----------
+    g
+        geometry to ghostify
+    
+    Returns
+    -------
+    geom 
+        ghostified geometry
+    """
+    c = g.copy()
+    c.ghostify()
+    return c
+
+def strip_identifier(g):
+    """
+    Note
+    ----
+    Strips the identifier.
+    
+    Parameters
+    ----------
+    g: geom 
+        geometry to strip the identifier of
+    """
+    c = g.copy()
+    c.strip_identifier()
+    return c
+
+def add_identifier(g, identifier):
+    """
+    Note
+    ----
+    Adds an identifier.
+    
+    Parameters
+    ----------
+    g: geom 
+        geometry to add the identifier to
+    identifier: str 
+        desired identifier. if not string tries to convert
+    """
+    c= g.copy()
+    c.add_identifier(identifier)
+    return c
+
+def change_identifier(g, identifier):
+    """
+    Note
+    ----
+    Changes the identifier.
+    
+    Parameters
+    ----------
+    g: geom 
+        geometry to change the identifier of
+    identifier: str 
+        desired identifier. if not string tries to convert
+    """
+    c= g.copy()
+    c.change_identifier(identifier)
+    return c        
+
 def have_same_atoms(g1,g2):
+    """
+    Note
+    ----
+    Useful for scripts where different operations are to be done if geomA.atoms==geomB.atoms or geomA.atoms!=geomB.atoms
+    
+    Parameters
+    ----------
+    g1: geom
+        the geometry to compare
+    g2: geom
+        the geometry to compare to
+        
+    Returns
+    -------
+    bool
+        whether they have the same atoms or not
+    """
     if len(g1.atoms) != len(g2.atoms):#Check if geometries have the same atom list
         return False
     elif (g1.atoms!=g2.atoms).all(): #Check if geometries have the same atom list
@@ -594,18 +863,61 @@ def have_same_atoms(g1,g2):
         return True
     
 def check_same_atoms(g1,g2):
+    """
+    Note
+    ----
+    Returns nothing! Just raises specific errors in case
+    
+    Parameters
+    ----------
+    g1: geom
+        the geometry to compare
+    g2: geom
+        the geometry to compare to
+        
+    """
     if len(g1.atoms) != len(g2.atoms):#Check if geometries have the same atom list
         raise NatomsError()
     elif (g1.atoms!=g2.atoms).all(): #Check if geometries have the same atom list
         raise atomsError()
         
 def have_same_unit(g1,g2):
+    """
+    Note
+    ----
+    Useful for scripts where different operations are to be done if geomA.coord_unit==geomB.coord_unit or geomA.coord_unit!=geomB.coord_unit (e.g. convert)
+    
+    Parameters
+    ----------
+    g1: geom
+        the geometry to compare
+    g2: geom
+        the geometry to compare to
+        
+    Returns
+    -------
+    bool
+        whether they have the same unit or not
+    """
     if g1.coord_unit != g2.coord_unit:#Check if geometries have the same atom list
         return False
     else:
         return True
     
 def check_same_unit(g1,g2):
+    """
+    Note
+    ----
+    Returns nothing! Just raises specific errors in case
+    
+    Parameters
+    ----------
+    g1: geom
+        the geometry to compare
+    g2: geom
+        the geometry to compare to
+
+    """
     if g1.coord_unit != g2.coord_unit:#Check if geometries have the same atom list
         raise unitError() 
         

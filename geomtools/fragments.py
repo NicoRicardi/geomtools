@@ -170,7 +170,7 @@ def get_bond_matrix(g): #todo: sum of vdw radii
     BM=np.maximum(BM,BM.T)
     return (BM, row_ord)
 
-def comb_geoms(*args,List=False):
+def comb_geoms(*args, List=False, keep_charges=False, keep_identifier=True):
     """
     Parameters
     ----------
@@ -188,10 +188,10 @@ def comb_geoms(*args,List=False):
     else:
         geoms=args
 
-    g_comb  = geoms[0]
+    g_comb  = geoms[0].copy()
     for i in geoms[1:]:
         g_comb.check_same_unit(i)
-        g_comb = geom(np.append(g_comb.atoms,i.atoms),np.append(g_comb.coords,i.coords,axis=0))
+        g_comb.add_atoms(i, keep_charges=keep_charges, keep_identifier=keep_identifier)
     return g_comb
 
 def get_fragments(g):  
@@ -211,18 +211,18 @@ def get_fragments(g):
     Natms=len(o)
     bonds = np.argwhere(BM==1)
     bonds = bonds[bonds[:,0] != bonds[:,1]]
-    j=0
-    f=[]
-    while len(list(it.chain.from_iterable(f))) < Natms:
-        f.append([])
-        f[j]=[min([i for i in range(Natms) if i not in list(it.chain.from_iterable(f))])]
-        cnt=0
+    j=0  # counter of fragments found
+    f=[]  # will be list of lists, NB, just indexes
+    while len(list(it.chain.from_iterable(f))) < Natms:  # obtains the list f[0]+f[1]+...+f[n]
+        f.append([])  # New empty fragment
+        f[j]=[min([i for i in range(Natms) if i not in list(it.chain.from_iterable(f))])]  # puts first unassigned atom in newly formed frag 
+        cnt=0  #counter of atoms checked
         while cnt<len(f[j]):
-            for i in f[j][cnt:]:
-                cnt=len(f[j])
-                f[j].extend([z for z in bonds[bonds[:,0]==i][:,1] if z not in f[j]])
-        j+=1
+            for i in f[j][cnt:]:  # only checking new ones
+                cnt=len(f[j])  #updating "checked" counter
+                f[j].extend([z for z in bonds[bonds[:,0]==i][:,1] if z not in f[j]])  #adding any new bound atom
+        j+=1  # counter of fragments found
     frags=[]
     for i in f:
-        frags.append(geom(g.atoms[o][i],g.coords[o][i]))
+        frags.append(geom(g.atoms[o][i],g.coords[o][i]))  # going from indexes to real frags(geom objects)
     return frags
