@@ -91,6 +91,10 @@ class geom:
         charges_dict: dict
             keys=method(s) values=array of charges
         """
+        if type(atoms) == str:
+            atoms = np.array([atoms])
+        if type(atoms) in [list, tuple]:
+            atoms = np.array(atoms)
         self.atoms = atoms
         if identifier:
             print("Beware of risky identifiers ('a','b','c','d') and third party modules! 'C'+'a/A' could be read as calcium!")
@@ -108,6 +112,10 @@ class geom:
         if type(identifier) == str:  # str => array of str
             identifier = np.array([identifier for i in range(len(self.atoms))])
         self.identifier = identifier
+        if type(coords) != np.ndarray:
+            raise TypeError("coords must be a numpy array")
+        if len(coords.shape) == 1:  # 1D array 
+            coords = coords.reshape(-1,3)
         self.coords = coords
         if not (np.array([len(self.atoms),len(self.identifier)])== len(self.coords)).all():
             raise sizemismatchError("atoms, identifier, and coords must have the same lenght!")
@@ -440,7 +448,7 @@ class geom:
         geom
             geometry object from the .xyz file
         """
-        from geomtools.io import read_xyz
+        from geomtools.geom_io import read_xyz
         return read_xyz(fnm, identifier=identifier)
     
     def from_coordfile(fnm, identifier="", inp="Angstrom", out="Angstrom"):
@@ -461,7 +469,7 @@ class geom:
         geom
             geometry object from the .xyz file
         """
-        from geomtools.io import read_coords
+        from geomtools.geom_io import read_coords
         return read_coords(fnm, identifier=identifier, inp=inp, out=out)  
     
     def from_string(coord_string, identifier="", inp="Angstrom", out="Angstrom"):
@@ -482,7 +490,7 @@ class geom:
         geom 
             geometry object from the coord file
         """
-        from geomtools.io import read_string
+        from geomtools.geom_io import read_string
         return read_string(coord_string, identifier=identifier, inp=inp, out=out)    
     
     def get_com(self):
@@ -539,10 +547,10 @@ class geom:
         ----------
         method : str
             method used to obtain the atomic point charges
-        charges : array or list[floats]
-            array/list of the atomic point charges        
+        charges : array or list/tuple[floats]
+            array/list/tuple of the atomic point charges        
         """
-        if type(charges) == list:
+        if type(charges) in [list,tuple]:
             charges=np.asarray(charges)
         elif type(charges) == np.ndarray:
             if len(charges.shape) == 1:
@@ -645,14 +653,14 @@ class geom:
         """
         Note
         ----
-        copies all attributes but atoms and coords from g. Useful for FF charges or custom attributes
+        copies all attributes but atoms, coords, and coord_units from g. Useful for FF charges or custom attributes
         
         Parameters
         ----------
         g: geom
             geometry to inherit from
         """
-        optionals=[i for i in self.__dict__.keys() if i not in ["atoms","coords"]]
+        optionals=[i for i in self.__dict__.keys() if i not in ["atoms","coords", "coord_unit"]]
         for i in optionals:
             setattr(self,i,getattr(g,i))
         
@@ -765,7 +773,7 @@ class geom:
         """
         Does not work yet. Do not know why
         """
-        from geomtools.io import write_xyz
+        from geomtools.geom_io import write_xyz
         write_xyz(self, fnm, decs=decimals, spacing=spaces)
 
 def ghostify(g):
