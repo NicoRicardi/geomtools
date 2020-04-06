@@ -440,7 +440,7 @@ class geom:
         geom
             geometry object from the .xyz file
         """
-        from geomtools.io import read_xyz
+        from geomtools.geom_io import read_xyz
         return read_xyz(fnm, identifier=identifier)
     
     def from_coordfile(fnm, identifier="", inp="Angstrom", out="Angstrom"):
@@ -461,7 +461,7 @@ class geom:
         geom
             geometry object from the .xyz file
         """
-        from geomtools.io import read_coords
+        from geomtools.geom_io import read_coords
         return read_coords(fnm, identifier=identifier, inp=inp, out=out)  
     
     def from_string(coord_string, identifier="", inp="Angstrom", out="Angstrom"):
@@ -482,7 +482,7 @@ class geom:
         geom 
             geometry object from the coord file
         """
-        from geomtools.io import read_string
+        from geomtools.geom_io import read_string
         return read_string(coord_string, identifier=identifier, inp=inp, out=out)    
     
     def get_com(self):
@@ -765,7 +765,7 @@ class geom:
         """
         Does not work yet. Do not know why
         """
-        from geomtools.io import write_xyz
+        from geomtools.geom_io import write_xyz
         write_xyz(self, fnm, decs=decimals, spacing=spaces)
 
 def ghostify(g):

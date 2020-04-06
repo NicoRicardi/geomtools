@@ -1,4 +1,5 @@
 build
-geomtools/h2.xyz
+*.xyz
+*.pyc
+*/__pycache__
 geomtools.egg-info
-setup.py
