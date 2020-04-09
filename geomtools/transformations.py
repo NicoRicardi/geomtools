@@ -22,12 +22,12 @@ def find_center(geom):
     import mendeleev as md
     tot = 0.0
     num = np.zeros(3)
-    for i in range(len(geom.atoms)):
+    for n,i in enumerate(geom.atoms):
         if "x" in i or "X" in i:  # ignoring ghost atoms
             continue
-        atom_contrib=md.element(geom.atoms[i]).atomic_weight
+        atom_contrib=md.element(i).atomic_weight
         tot=np.add(tot,atom_contrib)
-        num=np.add(num,np.multiply(atom_contrib,geom.coords[i]))
+        num=np.add(num,np.multiply(atom_contrib,geom.coords[n]))
     tot = 1 if tot==0 else tot  # if all ghosts avoid division by 0 and return [0,0,0]
     return np.divide(num,tot)
 
@@ -412,7 +412,7 @@ def kabsch_find_rot(g1, g2):
 
     return U
 
-def apply_planar_symm(g,plane):
+def apply_planar_symm(g, plane):
     """
     Parameters
     ----------
@@ -431,7 +431,7 @@ def apply_planar_symm(g,plane):
         s.coords[n]=plane.symmetric_point(atom)
     return s
 
-def apply_point_symm(g,point):
+def apply_point_symm(g, point):
     """
     Parameters
     ----------

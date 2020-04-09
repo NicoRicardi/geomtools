@@ -122,7 +122,7 @@ class geom:
         self.coord_unit = coord_unit.lower()
         self.charges = charges_dict
     
-    def __str__(self, identifier = True, spacing=4, decs=6):
+    def __str__(self, identifier = True, spacing=4, decimals=6):
         """
         Note
         ----
@@ -132,15 +132,15 @@ class geom:
         ----------
         spacing: int
             desired spacing between columns
-        decs: int
+        decimals: int
             number of decimal digits desired
         """
         if identifier:
-            return "\n".join([self.atoms[i]+self.identifier[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}'.format(self.coords[i][0],self.coords[i][1],self.coords[i][2],w=spacing+decs+1, p=decs) for i in range(len(self.atoms))])
+            return "\n".join([self.atoms[i]+self.identifier[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}'.format(self.coords[i][0],self.coords[i][1],self.coords[i][2],w=spacing+decimals+1, p=decimals) for i in range(len(self.atoms))])
         else:
-            return "\n".join([self.atoms[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}'.format(self.coords[i][0],self.coords[i][1],self.coords[i][2],w=spacing+decs+1, p=decs) for i in range(len(self.atoms))])
+            return "\n".join([self.atoms[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}'.format(self.coords[i][0],self.coords[i][1],self.coords[i][2],w=spacing+decimals+1, p=decimals) for i in range(len(self.atoms))])
         
-    def __repr__(self, spacing=4, decs=6):
+    def __repr__(self, spacing=4, decimals=6):
         """
         Note
         ----
@@ -150,12 +150,12 @@ class geom:
         ----------
         spacing: int
             desired spacing between columns
-        decs: int
+        decimals: int
             number of decimal digits desired
         """
-        return "\n".join([self.atoms[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}'.format(self.coords[i][0],self.coords[i][1],self.coords[i][2],w=spacing+decs+1, p=decs) for i in range(len(self.atoms))])
+        return "\n".join([self.atoms[i]+' {:{w}.{p}f} {:{w}.{p}f} {:{w}.{p}f}'.format(self.coords[i][0],self.coords[i][1],self.coords[i][2],w=spacing+decimals+1, p=decimals) for i in range(len(self.atoms))])
     
-    def __add__(self, g):
+    def __add__(self, add):
         """
         Note
         ----
@@ -163,18 +163,24 @@ class geom:
         
         Parameters
         ----------
-        g: geom
-            geometry to add
+        add: geom or vector(array/list(3))
+            geometry to add or vector to translate
         
         Returns
         -------
         geom
             the total geometry
         """
-        from geomtools.fragments import comb_geoms #TODO check identifier
-        return comb_geoms(self,g)
-    
-    def __iadd__(self, g):
+        if type(add) in [list, np.array]:
+            gt=self.copy()
+            gt.transl(add)
+            return gt
+        elif type(add) == geom:
+            from geomtools.fragments import comb_geoms #TODO check identifier
+            return comb_geoms(self,add)
+        else:
+            raise TypeError("Use + to combine geometry (e.g. g = gA + gB) or to translate (e.g. gt = g + [1,1,1])")
+    def __iadd__(self, add):
         """
         Note
         ----
@@ -185,8 +191,14 @@ class geom:
         g: geom
             geometry to add
         """
-        self.add_atoms(g) 
-        return self
+        if type(add) in [list, np.array]:
+            self.transl(add)
+            return self
+        elif type(add) == geom:
+            self.add_atoms(add)
+            return self
+        else:
+            raise TypeError("Use + to combine geometry (e.g. g = gA + gB) or to translate (e.g. gt = g + [1,1,1])")
         
     def __sub__(self,vect):
         """
@@ -204,8 +216,6 @@ class geom:
         geom
             the translated geometry
         """
-        if type(vect)==list:
-            vect=np.asarray(vect)
         gt=self.copy()
         gt.transl(-vect)
         return gt
@@ -221,8 +231,6 @@ class geom:
         vect: array (or list)
             vector to subtract
         """
-        if type(vect)==list:
-            vect=np.asarray(vect)        
         self.transl(-vect)
         return self
         
@@ -523,7 +531,7 @@ class geom:
             the coordinates translated so that the center of mass is in the origin
         """       
         if not hasattr(self, "com_coords"):
-            self.com_coords = self.inp_coords - self.get_com()
+            self.com_coords = self.coords - self.get_com()
         return self.com_coords    
     
     def center(self):
@@ -535,7 +543,8 @@ class geom:
             
         Translates the geometry so that the center of mass is in the origin
         """
-        self.coords = self.get_com_coords
+        self.coords = self.get_com_coords()
+        self.com = np.array([0.0,0.0,0.0])
     
     def add_charges(self, method, charges):
         """
@@ -590,7 +599,7 @@ class geom:
         
     def rot_matrix(self,M):
         """
-        Rotate with matrix M
+        Rotate with matrix M. If the geometry is not centered it deletes com and com_coords
     
         Parameters
         ----------
@@ -598,7 +607,14 @@ class geom:
             rotation matrix
             
         """
-        self.coords = np.dot(self.coords, M) 
+        self.coords = np.dot(self.coords, M)
+        if hasattr(self,"com"):
+            if not hasattr(self,"com_coords"):
+                if not (self.com != np.zeros(3)).all():
+                    del self.com
+            elif not (self.coords==self.com_coords).all():
+                del self.com
+                del self.com_coords
         
     def rot_ax(self, ax, x, angle_unit = "deg"): #todo: check if np.asmatrix can be avoided, implement for vector
         """
@@ -673,7 +689,7 @@ class geom:
         If keep_charges == False it will also delete the charges of self.
         If keep_identifier == False all atoms will have the identifier of self.
         If keep_identifier == True every atom will have its specific identifier,
-        and self.identifier will be as many spaces as the length of the different identifiers.
+        and self.identifier will be as many spacing as the length of the different identifiers.
         Identifiers of different length will raise an error.
         
         Parameters
@@ -769,12 +785,46 @@ class geom:
         """
         return geom(self.atoms[o],self.coords[o])
     
-    def to_xyz(self, fnm, decimals=6, spaces=4):
+    def to_xyz(self, fnm, decimals=6, spacing=4):
         """
-        Does not work yet. Do not know why
+        Parameters
+        ----------
+        fnm: str
+            filename to write
+        decimals: int
+            number of decimal digits desired
+        spacing: int
+            number of spaces desired
         """
         from geomtools.geom_io import write_xyz
-        write_xyz(self, fnm, decs=decimals, spacing=spaces)
+        write_xyz(self, fnm, decimals=decimals, spacing=spacing)
+        
+    def to_coordfile(self, fnm, unit="Angstrom", decimals=6, spacing=4):
+        """
+        Parameters
+        ----------
+        fnm: str
+            filename to write
+        decimals: int
+            number of decimal digits desired
+        spacing: int
+            number of spaces desired
+        """
+        from geomtools.geom_io import write_coords
+        write_coords(self, fnm, unit=unit, decimals=decimals, spacing=spacing)
+        
+    def to_string(self, identifier = True, decimals=6, spacing=4):
+        """
+        Parameters
+        ----------
+        identifier: bool
+            whether to print the identifier
+        decimals: int
+            number of decimal digits desired
+        spacing: int
+            number of spaces desired
+        """
+        return self.__str__(identifier=identifier, spacing=spacing, decimals=decimals)
 
 def ghostify(g):
     """

@@ -7,7 +7,7 @@ import numpy as np
 #import sys
 from geomtools.geom import geom
 
-def mix_geoms(g1, g2, ratio=0.5,):
+def mix_geoms(g1, g2, ratio=0.5):
     """
     Note
     ----
@@ -119,10 +119,10 @@ def geoms_reorder_equally(g1, g2, thresh=0.00005):
         raise geom.otherError("These are not the same geometry!!!")
     else:
         ncm=np.add(np.multiply(g1.get_com_coords()[o1][0],np.multiply(3,thresh)),np.multiply(np.multiply(1.5,thresh),np.random.rand(3)))
-        g1a, g2a = geom(g1.atoms,g1.get_com_coords() - ncm), geom(g2.atoms,g2.get_com_coords() - ncm) #todo: use transl
+        g1a, g2a = geom(g1.atoms,g1.get_com_coords() - ncm), geom(g2.atoms,g2.get_com_coords() - ncm)  #ctodo: use transl
         da1, oa1 = dist_order(g1a)
         da2, oa2 = dist_order(g2a)   
-        return (geom(g1.atoms[oa1],g1.coords[oa1]),geom(g2.atoms[oa2],g2.coords[oa2]))
+        return (geom(g1.atoms[oa1],g1.coords[oa1]),geom(g2.atoms[oa2],g2.coords[oa2]))  #TODO other attributes
 
 def get_ordd_dist_mat(g):
     """
@@ -134,8 +134,8 @@ def get_ordd_dist_mat(g):
     Returns
     -------
     tuple
-        (density matrix, ordering of the matrix rows and columns)
-        the density matrix is ordered so that the first line's values are in increasing order
+        (distance matrix, ordering of the matrix rows and columns)
+        the distance matrix is ordered so that the first line's values are in increasing order
     """
     from scipy.spatial import distance_matrix
     d, o = dist_order(g)
