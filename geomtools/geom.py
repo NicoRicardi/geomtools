@@ -442,6 +442,20 @@ class geom:
         if dict_[self.coord_unit.lower()] != dict_[g.coord_unit.lower()]:
             raise unitError()
             
+    def rmsd(self,g):
+        """
+        Parameters
+        ----------
+        g: geometry or array
+            geometry to calculate the RMSD with
+            
+        Returns
+        -------
+        the root mean square deviation between self and g. If g is a geometry it checks for equal atoms and unit.
+        """
+        from geomtools.transformations import rmsd
+        return rmsd(self,g)
+            
     def from_xyz(fnm, identifier=""):
         """
         Parameters

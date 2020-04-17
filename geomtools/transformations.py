@@ -276,11 +276,14 @@ def rmsd(V, W):
     float
         Root-mean-square deviation between the two vectors
     """
-    for i in [V,W]: #TODO change!!!
-        try:
-            i=i.coords
-        except:
-            pass
+    if [type(i) for i in [V,W]] == [geom, geom]:
+        V.check_same_atoms(W)
+        V.check_same_unit(W)
+        print("checked that they have the same atom and the same unit")    
+    if type(V) == geom:
+        V = V.coords
+    if type(W) == geom:
+        W = W.coords
     D = len(V[0])
     N = len(V)
     result = 0.0
@@ -308,11 +311,14 @@ def kabsch_rmsd(g1, g2):
     float
         root-mean squared deviation
     """
-    for i in [g1,g2]: # TODO change!!
-        try:
-            i=i.coords
-        except:
-            pass
+    if [type(i) for i in [g1,g2]] == [geom, geom]:
+        g1.check_same_atoms(g2)
+        g1.check_same_unit(g2)
+        print("checked that they have the same atom and the same unit")    
+    if type(g1) == geom:
+        g1 = g1.coords
+    if type(g2) == geom:
+        g2 = g2.coords
     g1 = kabsch_rotate(g1, g2)
     return rmsd(g1, g2)
 
@@ -340,9 +346,9 @@ def kabsch_rotate(g1, g2):
     """
     c=[]
     for i in [g1,g2]:
-        try:
+        if type(i) == geom:
             c.append(i.coords)
-        except:
+        else:
             c.append(i)
     U = kabsch_find_rot(c[0], c[1])
 
@@ -382,14 +388,10 @@ def kabsch_find_rot(g1, g2):
     array(3,3)
         Rotation matrix (3,3)
     """
-    try:
-        g1=g1.coords
-    except:
-        pass
-    try:
-        g2=g2.coords
-    except:
-        pass
+    if type(g1) == geom:
+        g1 = g1.coords
+    if type(g2) == geom:
+        g2 = g2.coords
     # Computation of the covariance matrix
     C = np.dot(np.transpose(g1), g2)
 
