@@ -455,7 +455,26 @@ class geom:
         """
         from geomtools.transformations import rmsd
         return rmsd(self,g)
+    
+    def kabsch_rmsd(self,g):
+        """
+        Note
+        ----
+        Does not change any geometry. Just returns the minimised RMSD (Kabsch algorithm)
+        Parameters
+        ----------
+        g: geometry or array
+            geometry to calculate the kabsch_RMSD with
             
+        Returns
+        -------
+        the root mean square deviation between self and g. If g is a geometry it checks for equal atoms and unit.
+        """
+        from geomtools.transformations import kabsch_rmsd, center
+        g1 = center(self)
+        g2 = center(g)
+        return kabsch_rmsd(g1,g2)         
+    
     def from_xyz(fnm, identifier=""):
         """
         Parameters

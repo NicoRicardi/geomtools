@@ -296,14 +296,14 @@ def kabsch_rmsd(g1, g2):
     """
     Note
     ----
-    Rotate geometry P unto Q using Kabsch algorithm and calculate the RMSD.
+    Rotate geometry g1 onto g2 using Kabsch algorithm and calculate the RMSD.
     NB reads both np.array(coords) or geom
     
     Parameters
     ----------
-    P : array or geom
+    g1 : array or geom
         (Natoms,3) coord array
-    Q : array or geom
+    g2 : array or geom
         (Natoms,3) coord array 
         
     Returns
@@ -327,14 +327,14 @@ def kabsch_rotate(g1, g2):
     """
     Note
     ----
-    Rotate geometry P unto matrix Q using Kabsch algorithm.
+    Rotate geometry g1 unto matrix g2 using Kabsch algorithm.
     NB reads both np.array(coords) or geom
     
     Parameters
     ----------
-    P : array or geom
+    g1 : array or geom
         (Natoms,3) coord array
-    Q : array or geom
+    g2 : array or geom
         (Natoms,3) coord array
         
     Returns
@@ -364,12 +364,12 @@ def kabsch_find_rot(g1, g2):
     """
     Note
     ----
-    Using the Kabsch algorithm with two sets of paired point P and Q, centered
+    Using the Kabsch algorithm with two sets of paired point g1 and g2, centered
     around the centroid. Each vector set is represented as an NxD
     matrix, where D is the the dimension of the space.
 
     The algorithm works in three steps:
-    - a centroid translation of P and Q (assumed done before this function
+    - a centroid translation of g1 and g2 (assumed done before this function
       call)
     - the computation of a covariance matrix C
     - computation of the optimal rotation matrix U
@@ -378,9 +378,9 @@ def kabsch_find_rot(g1, g2):
 
     Parameters
     ----------
-    P : array
+    g1 : array
         (Natoms,3) coord array
-    Q : array
+    g2 : array
         (Natoms,3) coord array
         
     Returns
