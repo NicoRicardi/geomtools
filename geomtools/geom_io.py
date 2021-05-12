@@ -6,7 +6,7 @@ Contains all input-output functions
 import numpy as np
 from geomtools.geom import geom
     
-def read_xyz(fnm, identifier=""):
+def read_xyz(fnm, identifier="")
     """
     Parameters
     ----------
@@ -19,16 +19,11 @@ def read_xyz(fnm, identifier=""):
     -------
     geom 
         geometry object from the .xyz file
-    """
-    with open(fnm,"r") as f:
-        rl=f.readlines()
-        Natoms=int(rl[0])
-        atoms=[]
-        coords=[]
-        for i in range(2,Natoms+2):
-            atoms.append(rl[i].split()[0])
-            coords.append(np.asarray([np.float64(i) for i in rl[i].split()[1:]]))
-        Geom=geom(np.array(atoms), np.array(coords), identifier=identifier, coord_unit="Angstrom", charges_dict={})
+    """:
+    tmp = np.loadtxt(fnm, skiprows=2, dtype="object")
+    atoms = tmp[:,0].astype("str")
+    coords = tmp[:,1:].astype("float")
+    Geom = geom(np.array(atoms), np.array(coords), identifier=identifier, coord_unit="Angstrom", charges_dict={})
     return Geom
 
 def read_zr(fnm):
@@ -46,14 +41,14 @@ def read_zr(fnm):
         geometry object of fragment B from the .zr file   
     """
     with open(fnm,"r") as f:
-        rl=f.readlines()
-        Natoms=len(rl)-1
-        atoms=[[],[]]
-        coords=[[],[]]
-        AorB=0
-        for i in range(0,Natoms+1):
-            if rl[i]=="----\n":
-                AorB=1
+        rl = f.readlines()
+        Natoms = len(rl)-1
+        atoms = [[], []]
+        coords = [[], []]
+        AorB = 0
+        for i in range(0, Natoms+1):
+            if rl[i] == "----\n":
+                AorB = 1
             else:
                 atoms[AorB].append(rl[i].split()[0])
                 coords[AorB].append(np.asarray([np.float64(i) for i in rl[i].split()[1:]]))
@@ -80,23 +75,18 @@ def read_coords(fnm, identifier="", inp="Angstrom", out="Angstrom"):
         geometry object from the coord file
     """
     dict_ = {"angstrom":"angstrom","au":"au","a.u.":"au","bohr":"au"}
-    with open(fnm,"r") as f:
-        rl=f.readlines()
-        Natoms=int(rl[0])
-        atoms=[]
-        coords=[]
-        for i in range(Natoms):
-            atoms.append(rl[i].split()[0])
-            coords.append(np.asarray([np.float64(i) for i in rl[i].split()[1:]]))
-        if dict_[inp.lower()]==dict_[out.lower()]:
-            pass
-        elif dict_[inp.lower()]=="au" and dict_[out.lower()]=="angstrom":
-            coords=np.multiply(0.529177,coords)
-        elif dict_[inp.lower()]=="angstrom" and dict_[out.lower()]=="au":
-            coords=np.divide(coords,0.529177)
-        else:
-            print("combination of units of measure not implemented yet. Why don't you do it, champ?")
-        Geom=geom(np.array(atoms), np.array(coords), identifier=identifier, coord_unit=out, charges_dict={})
+    tmp = np.loadtxt(fnm, skiprows=2, dtype="object")
+    atoms = tmp[:,0].astype("str")
+    coords = tmp[:,1:].astype("float")
+    if dict_[inp.lower()] == dict_[out.lower()]:
+        pass
+    elif dict_[inp.lower()] == "au" and dict_[out.lower()] == "angstrom":
+        coords=np.multiply(0.529177,coords)
+    elif dict_[inp.lower()] == "angstrom" and dict_[out.lower()] == "au":
+        coords=np.divide(coords,0.529177)
+    else:
+        print("combination of units of measure not implemented yet. Why don't you do it, champ?")
+    Geom=geom(np.array(atoms), np.array(coords), identifier=identifier, coord_unit=out, charges_dict={})
     return Geom
 
 def read_string(coord_string, identifier="", inp="Angstrom", out="Angstrom"):

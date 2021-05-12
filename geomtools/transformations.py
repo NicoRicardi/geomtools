@@ -284,12 +284,30 @@ def rmsd(V, W):
         V = V.coords
     if type(W) == geom:
         W = W.coords
-    D = len(V[0])
-    N = len(V)
-    result = 0.0
-    for v, w in zip(V, W):
-        result += sum([(v[i] - w[i])**2.0 for i in range(D)])
-    return np.sqrt(result/N)
+    return np.sqrt((((V - W)**2).sum(axis=1)).mean())
+
+def rmsd_arr(V, W):
+    """
+    Note
+    ----
+    Calculate Root-mean-square deviation between two geometries.
+    NB reads both np.array(coords) or geom.
+
+    Parameters
+    ----------
+    V : array(Ngeoms, Natoms, 3)
+        array of geometries such that V[i] = (Natoms, 3)
+    W : array(Ngeoms, Natoms, 3) or array(Natoms, 3)
+        either another array of geometries or a single ones
+
+    Returns
+    -------
+    np.array(Ngeoms)
+        Root-mean-square deviation values.
+        if W is a single geometry, equivalent to np.array([rmsd(W[i],V) for i in range(Ngeoms)])
+        if W is an array of geometries, equivalent to np.array([rmsd(W[i],V[i]) for i in range(Ngeoms)])
+    """
+    return np.sqrt((((V - W)**2).sum(axis=2)).mean(axis=1))
 
 
 def kabsch_rmsd(g1, g2):

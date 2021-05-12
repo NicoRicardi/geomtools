@@ -3,7 +3,7 @@ setup.py
 geomtools/__init__.py
 geomtools/fragments.py
 geomtools/geom.py
-geomtools/io.py
+geomtools/geom_io.py
 geomtools/transformations.py
 geomtools.egg-info/PKG-INFO
 geomtools.egg-info/SOURCES.txt
