@@ -6,7 +6,7 @@ Contains all input-output functions
 import numpy as np
 from geomtools.geom import geom
     
-def read_xyz(fnm, identifier="")
+def read_xyz(fnm, identifier=""):
     """
     Parameters
     ----------
@@ -19,7 +19,7 @@ def read_xyz(fnm, identifier="")
     -------
     geom 
         geometry object from the .xyz file
-    """:
+    """
     tmp = np.loadtxt(fnm, skiprows=2, dtype="object")
     atoms = tmp[:,0].astype("str")
     coords = tmp[:,1:].astype("float")
